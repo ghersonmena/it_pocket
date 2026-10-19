@@ -87,7 +87,7 @@ export const EditTaskSheet: React.FC<EditTaskSheetProps> = ({ title, initialName
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          width: '100%', maxWidth: '520px', maxHeight: '88vh', display: 'flex', flexDirection: 'column',
+          width: '100%', maxWidth: '520px', maxHeight: '88dvh', display: 'flex', flexDirection: 'column',
           background: 'var(--card-bg)', borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
           boxShadow: 'var(--shadow-lg)', paddingBottom: 'env(safe-area-inset-bottom, 0px)'
         }}

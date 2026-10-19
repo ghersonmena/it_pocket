@@ -449,7 +449,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({ fieldLabel, kind, on
         {candidates !== null && (
           <>
             <div style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 600, marginBottom: '6px' }}>Toca el valor correcto</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '32vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '32dvh', overflowY: 'auto' }}>
               {candidates.map((value, i) => (
                 <button
                   key={value}

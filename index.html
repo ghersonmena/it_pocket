@@ -1,10 +1,20 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>glpi_app</title>
+    <!-- viewport-fit=cover: ocupa también la zona del notch (la app respeta los márgenes seguros);
+         interactive-widget: el teclado encoge la app en vez de empujarla hacia arriba -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#2563eb" />
+    <!-- Al agregarla a la pantalla de inicio abre a pantalla completa, sin barra del navegador -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="GLPI Mobile" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" href="/icons/favicon-64.png" />
+    <title>GLPI Mobile</title>
   </head>
   <body>
     <div id="root"></div>

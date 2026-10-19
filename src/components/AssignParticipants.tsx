@@ -87,7 +87,7 @@ export const AssignParticipants: React.FC<AssignParticipantsProps> = ({
         style={{
           width: '100%',
           maxWidth: '520px',
-          maxHeight: '80vh',
+          maxHeight: '80dvh',
           display: 'flex',
           flexDirection: 'column',
           background: 'var(--card-bg)',

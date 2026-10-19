@@ -446,7 +446,7 @@ export const ItemPhotos: React.FC<ItemPhotosProps> = ({
           >
             <X size={20} />
           </button>
-          <img src={viewing.url} alt={viewing.name} style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain' }} />
+          <img src={viewing.url} alt={viewing.name} style={{ maxWidth: '100%', maxHeight: '85dvh', objectFit: 'contain' }} />
           <div style={{ marginTop: '8px', fontSize: '0.75rem', color: '#cbd5e1', textAlign: 'center' }}>
             {viewing.name}
           </div>

@@ -38,14 +38,20 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* La página en sí nunca se desliza ni "rebota": solo se desplaza el contenido de la app.
+   Así se comporta como app nativa y el botón "+" no se va de la pantalla. */
+html, body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 body {
   background-color: #0f172a;
   color: var(--text-main);
-  min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  overflow-x: hidden;
 }
 
 /* #root es hijo flex del body: sin ancho fijo se encogía al ancho de su contenido, y las
@@ -61,8 +67,10 @@ body {
 .mobile-app-wrapper {
   width: 100%;
   max-width: 480px;
+  /* En el teléfono 100vh mide la pantalla SIN la barra del navegador, así que la app quedaba
+     más alta que lo visible. 100dvh es el alto visible real (cambia con la barra). */
   height: 100vh;
-  max-height: 920px;
+  height: 100dvh;
   background-color: var(--bg-main);
   display: flex;
   flex-direction: column;
@@ -81,6 +89,8 @@ body {
   .mobile-app-wrapper {
     border-radius: 36px;
     height: 90vh;
+    height: 90dvh;
+    max-height: 920px;
     border: 8px solid #1e293b;
   }
 }
@@ -95,6 +105,8 @@ body {
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--glass-border);
   padding: 16px 20px;
+  /* Abierta como app (pantalla completa) la barra de estado / notch queda encima */
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -138,9 +150,13 @@ body {
 .app-content {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 20px;
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
   /* espacio para que el botón "+" flotante no tape el final de las listas */
-  padding-bottom: 90px;
+  padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
 }
 
 /* Ocultar scrollbar pero mantener scroll */
