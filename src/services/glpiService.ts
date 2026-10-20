@@ -1245,6 +1245,20 @@ export class GLPIService {
    * GLPI exige los encabezados de sesión, así que no se puede usar la URL directo en <img>.
    * Quien lo llama debe liberar la URL con URL.revokeObjectURL al dejar de mostrarla.
    */
+  /** Contenido de un documento de GLPI (para verlo dentro de la app). */
+  static async getDocumentBlob(session: GLPISession, documentId: number): Promise<Blob> {
+    if (session.isMock) {
+      const doc = Object.values(MOCK_ITEM_PHOTOS).flat().find(d => d.id === documentId);
+      if (!doc?.url) throw new Error('Documento demo no disponible');
+      return (await fetch(doc.url)).blob();
+    }
+    const res = await fetch(`${session.baseUrl}/apirest.php/Document/${documentId}`, {
+      headers: { 'Accept': 'application/octet-stream', 'App-Token': session.appToken, 'Session-Token': session.sessionToken }
+    });
+    if (!res.ok) throw new Error(`No se pudo descargar el documento (${res.status})`);
+    return res.blob();
+  }
+
   static async getPhotoObjectUrl(session: GLPISession, photo: GLPITaskPhoto): Promise<string> {
     if (session.isMock) return photo.url || '';
 

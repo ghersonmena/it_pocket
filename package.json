@@ -17,6 +17,7 @@
     "@zxing/library": "^0.23.0",
     "dompurify": "^3.4.16",
     "lucide-react": "^1.54.0",
+    "mammoth": "1.12.3",
     "pdfjs-dist": "^6.3.289",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

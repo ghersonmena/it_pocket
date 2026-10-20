@@ -66,3 +66,43 @@ export const renderPdfPage = async (file: Blob, pageNumber = 1): Promise<{ blob:
     await release();
   }
 };
+
+/**
+ * Renderiza las páginas de un PDF para verlo dentro de la app (resolución de pantalla, no de
+ * impresión). Cada página se entrega al terminar con onPage, así se van mostrando conforme
+ * llegan. Devuelve el total de páginas del documento.
+ */
+export const renderPdfPagesForViewing = async (
+  file: Blob,
+  onPage: (index: number, image: { url: string; width: number; height: number }) => void,
+  options: { maxPages?: number; width?: number; isCancelled?: () => boolean } = {}
+): Promise<number> => {
+  const { maxPages = 60, width = 1400, isCancelled } = options;
+  const { pdf, release } = await loadPdf(file);
+  try {
+    const total = pdf.numPages;
+    for (let n = 1; n <= Math.min(total, maxPages); n++) {
+      if (isCancelled?.()) break;
+      const page = await pdf.getPage(n);
+      const base = page.getViewport({ scale: 1 });
+      const scale = Math.min(width / base.width, Math.sqrt(MAX_PIXELS / 2 / (base.width * base.height)));
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      await page.render({ canvas, viewport }).promise;
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob(b => (b ? resolve(b) : reject(new Error('No se pudo mostrar la página del PDF'))), 'image/jpeg', 0.88)
+      );
+      onPage(n - 1, { url: URL.createObjectURL(blob), width: canvas.width, height: canvas.height });
+    }
+    return total;
+  } finally {
+    await release();
+  }
+};

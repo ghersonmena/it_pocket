@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { GLPISession } from '../types/glpi';
 import { KnowledgeService } from '../services/knowledgeService';
 import type { KbArticle, KbCategory, KbArticleContent, KbAttachment } from '../services/knowledgeService';
-import { ImageViewer } from './ImageViewer';
+import { ImageViewer, type ViewerImage } from './ImageViewer';
+import { DocumentViewer } from './DocumentViewer';
 import { BookOpen, Search, RefreshCw, ArrowLeft, Eye, Paperclip, FolderOpen, ChevronRight, X } from 'lucide-react';
 
 interface KnowledgeScreenProps {
@@ -221,9 +222,10 @@ const ArticleView: React.FC<{
 }> = ({ session, article, categories, onBack, onOpenArticle }) => {
   const [content, setContent] = useState<KbArticleContent | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [opening, setOpening] = useState<number | null>(null);
-  // Imagen abierta en el visor con zoom
-  const [zoomImage, setZoomImage] = useState<{ src: string; alt: string } | null>(null);
+  // Adjunto abierto en el visor de documentos
+  const [viewingAttachment, setViewingAttachment] = useState<KbAttachment | null>(null);
+  // Imágenes del artículo abiertas en el visor (galería) y la que se tocó
+  const [zoomImages, setZoomImages] = useState<{ images: ViewerImage[]; index: number } | null>(null);
   const urlsRef = useRef<string[]>([]);
 
   useEffect(() => {
@@ -239,24 +241,6 @@ const ArticleView: React.FC<{
 
   // Liberar imágenes y adjuntos descargados al cerrar el artículo
   useEffect(() => () => { urlsRef.current.forEach(u => URL.revokeObjectURL(u)); }, []);
-
-  const openAttachment = async (att: KbAttachment) => {
-    // La pestaña se abre en el mismo toque (si no, el navegador la bloquea) y luego se carga
-    const tab = window.open('', '_blank');
-    setOpening(att.id);
-    try {
-      const url = await KnowledgeService.getAttachmentUrl(session, att);
-      urlsRef.current.push(url);
-      // Si el navegador bloqueó la pestaña, se intenta de nuevo; nunca se reemplaza la app
-      if (tab) tab.location.href = url;
-      else if (!window.open(url, '_blank')) setError(`Permite las ventanas emergentes para abrir "${att.name}".`);
-    } catch {
-      tab?.close();
-      setError(`No se pudo abrir "${att.name}".`);
-    } finally {
-      setOpening(null);
-    }
-  };
 
   const categoryText = article.categoryIds
     .map(id => categories.find(c => c.id === id)?.completename)
@@ -299,7 +283,9 @@ const ArticleView: React.FC<{
                 const img = (e.target as HTMLElement).closest('img') as HTMLImageElement | null;
                 if (img?.src) {
                   e.preventDefault();
-                  setZoomImage({ src: img.src, alt: img.alt });
+                  // Todas las imágenes del artículo, para pasar de una a otra deslizando
+                  const all = [...(e.currentTarget as HTMLElement).querySelectorAll('img')].filter(i => i.src);
+                  setZoomImages({ images: all.map(i => ({ src: i.src, alt: i.alt })), index: Math.max(0, all.indexOf(img)) });
                   return;
                 }
                 // Enlace a otro artículo de la base de conocimiento: se abre aquí mismo
@@ -314,7 +300,14 @@ const ArticleView: React.FC<{
         </div>
       </div>
 
-      {zoomImage && <ImageViewer src={zoomImage.src} alt={zoomImage.alt} onClose={() => setZoomImage(null)} />}
+      {zoomImages && <ImageViewer images={zoomImages.images} initialIndex={zoomImages.index} onClose={() => setZoomImages(null)} />}
+      {viewingAttachment && (
+        <DocumentViewer
+          session={session}
+          doc={{ id: viewingAttachment.id, name: viewingAttachment.name, filename: viewingAttachment.filename, mime: viewingAttachment.mime }}
+          onClose={() => setViewingAttachment(null)}
+        />
+      )}
 
       {content && content.attachments.length > 0 && (
         <div className="card">
@@ -325,11 +318,10 @@ const ArticleView: React.FC<{
             <button
               key={att.id}
               type="button"
-              onClick={() => openAttachment(att)}
-              disabled={opening === att.id}
+              onClick={() => setViewingAttachment(att)}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', border: 'none', borderTop: '1px solid var(--border-color)', background: 'none', textAlign: 'left', cursor: 'pointer' }}
             >
-              {opening === att.id ? <RefreshCw size={16} className="spin" color="var(--primary)" /> : <Paperclip size={16} color="var(--primary)" />}
+              <Paperclip size={16} color="var(--primary)" />
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-main)', wordBreak: 'break-word' }}>{att.name}</span>
                 {att.mime && <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)' }}>{att.mime}</span>}

@@ -1,10 +1,18 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Maximize, ChevronLeft, ChevronRight } from 'lucide-react';
 
-interface ImageViewerProps {
+export interface ViewerImage {
   src: string;
   alt?: string;
+}
+
+interface ImageViewerProps {
+  // Una imagen (src/alt) o una galería (images + initialIndex)
+  src?: string;
+  alt?: string;
+  images?: ViewerImage[];
+  initialIndex?: number;
   onClose: () => void;
 }
 
@@ -12,10 +20,15 @@ interface View { tx: number; ty: number; s: number }
 
 const MAX_ZOOM = 6;
 const DOUBLE_TAP_MS = 300;
+const SWIPE_PX = 50; // desplazamiento horizontal para pasar a la siguiente imagen
 
 // Visor de imagen a pantalla completa con zoom: pellizco, doble toque, rueda o botones,
-// y arrastre para moverse por la imagen ampliada
-export const ImageViewer: React.FC<ImageViewerProps> = ({ src, alt, onClose }) => {
+// y arrastre para moverse por la imagen ampliada. Con varias imágenes es una galería: sin zoom,
+// deslizar a la izquierda o a la derecha (o las flechas) pasa a la siguiente o a la anterior.
+export const ImageViewer: React.FC<ImageViewerProps> = ({ src, alt, images, initialIndex = 0, onClose }) => {
+  const list: ViewerImage[] = images && images.length ? images : src ? [{ src, alt }] : [];
+  const [index, setIndex] = useState<number>(Math.min(Math.max(initialIndex, 0), Math.max(list.length - 1, 0)));
+  const current = list[index] || { src: '', alt: '' };
   const containerRef = useRef<HTMLDivElement>(null);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [fit, setFit] = useState<number>(1);
@@ -24,6 +37,16 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ src, alt, onClose }) =
   const pinch = useRef<number | null>(null);
   const lastTap = useRef<{ time: number; x: number; y: number } | null>(null);
   const moved = useRef<number>(0);
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
+
+  const go = useCallback((step: number) => {
+    setIndex(i => {
+      const next = i + step;
+      if (next < 0 || next >= list.length) return i;
+      setNatural(null); // la nueva imagen se vuelve a encajar al cargar
+      return next;
+    });
+  }, [list.length]);
 
   // Encajar la imagen completa en la pantalla
   const fitToScreen = useCallback(() => {
@@ -37,10 +60,14 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ src, alt, onClose }) =
   useEffect(() => { fitToScreen(); }, [fitToScreen]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowRight') go(1);
+      else if (e.key === 'ArrowLeft') go(-1);
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, go]);
 
   // Zoom relativo a la imagen encajada en pantalla (100% = imagen completa visible). Máximo 6x
   // de eso, o 2x los píxeles reales si la imagen es pequeña
@@ -61,7 +88,10 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ src, alt, onClose }) =
   const onPointerDown = (e: React.PointerEvent) => {
     containerRef.current?.setPointerCapture(e.pointerId);
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.current.size === 1) moved.current = 0;
+    if (pointers.current.size === 1) {
+      moved.current = 0;
+      dragStart.current = { x: e.clientX, y: e.clientY };
+    }
     if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()];
       pinch.current = Math.hypot(a.x - b.x, a.y - b.y);
@@ -87,6 +117,16 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ src, alt, onClose }) =
   const onPointerUp = (e: React.PointerEvent) => {
     pointers.current.delete(e.pointerId);
     if (pointers.current.size < 2) pinch.current = null;
+    const start = dragStart.current;
+    if (pointers.current.size === 0) dragStart.current = null;
+    // Galería: sin zoom, un deslizamiento horizontal cambia de imagen; si no, vuelve a su lugar
+    if (pointers.current.size === 0 && moved.current > 10 && view.s <= fit * 1.05) {
+      const dx = start ? e.clientX - start.x : 0;
+      const dy = start ? e.clientY - start.y : 0;
+      if (list.length > 1 && Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy)) go(dx < 0 ? 1 : -1);
+      else fitToScreen();
+      return;
+    }
     if (pointers.current.size > 0 || moved.current > 10) return;
     // Doble toque: acercar a 2.5x de lo que se ve en ese punto, o volver a ver completa
     const now = Date.now();
@@ -121,14 +161,18 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ src, alt, onClose }) =
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={alt || 'Imagen'}
+      aria-label={current.alt || 'Imagen'}
       style={{ position: 'fixed', inset: 0, zIndex: 1300, background: '#0b0b0b', display: 'flex', flexDirection: 'column' }}
     >
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
         padding: 'calc(10px + env(safe-area-inset-top, 0px)) 12px 10px', color: '#e2e8f0'
       }}>
-        <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>{percent}%</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, fontSize: '0.78rem', fontWeight: 700 }}>
+          {list.length > 1 && <span style={{ flexShrink: 0, whiteSpace: 'nowrap', padding: '3px 9px', borderRadius: '999px', background: 'rgba(255, 255, 255, 0.15)' }}>{index + 1} / {list.length}</span>}
+          <span style={{ flexShrink: 0 }}>{percent}%</span>
+          {current.alt && <span style={{ fontWeight: 600, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{current.alt}</span>}
+        </span>
         <button type="button" onClick={onClose} aria-label="Cerrar imagen" style={buttonStyle}>
           <X size={20} />
         </button>
@@ -144,8 +188,9 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ src, alt, onClose }) =
         style={{ position: 'relative', flex: 1, overflow: 'hidden', touchAction: 'none', cursor: view.s > fit ? 'grab' : 'zoom-in' }}
       >
         <img
-          src={src}
-          alt={alt || ''}
+          key={current.src}
+          src={current.src}
+          alt={current.alt || ''}
           draggable={false}
           onLoad={e => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
           style={{
@@ -154,6 +199,18 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ src, alt, onClose }) =
             transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.s})`, transformOrigin: '0 0'
           }}
         />
+        {list.length > 1 && index > 0 && (
+          <button type="button" onClick={() => go(-1)} onPointerDown={e => e.stopPropagation()} aria-label="Imagen anterior"
+            style={{ ...buttonStyle, position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0, 0, 0, 0.45)' }}>
+            <ChevronLeft size={22} />
+          </button>
+        )}
+        {list.length > 1 && index < list.length - 1 && (
+          <button type="button" onClick={() => go(1)} onPointerDown={e => e.stopPropagation()} aria-label="Imagen siguiente"
+            style={{ ...buttonStyle, position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0, 0, 0, 0.45)' }}>
+            <ChevronRight size={22} />
+          </button>
+        )}
       </div>
 
       <div style={{

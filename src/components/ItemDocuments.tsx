@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { GLPISession, GLPITaskPhoto } from '../types/glpi';
 import { GLPIService } from '../services/glpiService';
-import { FileText, Paperclip, RefreshCw, ExternalLink } from 'lucide-react';
+import { DocumentViewer } from './DocumentViewer';
+import { FileText, Paperclip, RefreshCw, ChevronRight } from 'lucide-react';
 
 // Rubro "ARCHIVOS DOCUMENTACION" (Configuración → Desplegables → Rubros de documentos)
 export const DOCUMENTATION_CATEGORY_ID = 14;
@@ -18,10 +19,9 @@ export const ItemDocuments: React.FC<ItemDocumentsProps> = ({ session, itemtype,
   const [docs, setDocs] = useState<GLPITaskPhoto[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [uploading, setUploading] = useState<boolean>(false);
-  const [opening, setOpening] = useState<number | null>(null);
+  const [viewing, setViewing] = useState<GLPITaskPhoto | null>(null);
   const [error, setError] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const urlsRef = useRef<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,8 +31,6 @@ export const ItemDocuments: React.FC<ItemDocumentsProps> = ({ session, itemtype,
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [session, itemtype, itemId]);
-
-  useEffect(() => () => { urlsRef.current.forEach(u => URL.revokeObjectURL(u)); }, []);
 
   const upload = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -58,23 +56,6 @@ export const ItemDocuments: React.FC<ItemDocumentsProps> = ({ session, itemtype,
     }
   };
 
-  const open = async (doc: GLPITaskPhoto) => {
-    // La pestaña se abre en el mismo toque (si no, el navegador la bloquea) y luego se carga
-    const tab = window.open('', '_blank');
-    setOpening(doc.id);
-    try {
-      const url = await GLPIService.getPhotoObjectUrl(session, doc);
-      urlsRef.current.push(url);
-      if (tab) tab.location.href = url;
-      else if (!window.open(url, '_blank')) setError(`Permite las ventanas emergentes para abrir "${doc.filename || doc.name}".`);
-    } catch {
-      tab?.close();
-      setError(`No se pudo abrir "${doc.filename || doc.name}".`);
-    } finally {
-      setOpening(null);
-    }
-  };
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       {loading ? (
@@ -88,8 +69,7 @@ export const ItemDocuments: React.FC<ItemDocumentsProps> = ({ session, itemtype,
           <button
             key={doc.id}
             type="button"
-            onClick={() => open(doc)}
-            disabled={opening === doc.id}
+            onClick={() => setViewing(doc)}
             style={{
               display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '12px', textAlign: 'left',
               border: '1px solid var(--border-color)', background: 'var(--card-bg)', color: 'var(--text-main)', cursor: 'pointer'
@@ -100,12 +80,14 @@ export const ItemDocuments: React.FC<ItemDocumentsProps> = ({ session, itemtype,
               <span style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, overflowWrap: 'anywhere' }}>{doc.filename || doc.name}</span>
               {doc.date && <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)' }}>{doc.date.slice(0, 16)}</span>}
             </span>
-            {opening === doc.id ? <RefreshCw size={14} className="spin" /> : <ExternalLink size={14} color="var(--text-muted)" />}
+            <ChevronRight size={16} color="var(--text-muted)" />
           </button>
         ))
       )}
 
       {error && <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#dc2626' }}>{error}</div>}
+
+      {viewing && <DocumentViewer session={session} doc={viewing} onClose={() => setViewing(null)} />}
 
       <input ref={inputRef} type="file" multiple hidden onChange={e => upload(e.target.files)} />
       <button

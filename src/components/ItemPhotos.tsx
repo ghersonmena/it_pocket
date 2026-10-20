@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import type { GLPISession, GLPITaskPhoto, PhotoCategory } from '../types/glpi';
 import { GLPIService } from '../services/glpiService';
 import { CameraCapture } from './CameraCapture';
 import { RefreshCw, Camera, Image as ImageIcon, X, Upload } from 'lucide-react';
+import { ImageViewer } from './ImageViewer';
 
 interface ItemPhotosProps {
   session: GLPISession;
@@ -425,34 +425,17 @@ export const ItemPhotos: React.FC<ItemPhotosProps> = ({
         />
       )}
 
-      {/* Visor a pantalla completa (portal a <body> por el transform del contenedor animado) */}
-      {viewing?.url && createPortal(
-        <div
-          onClick={() => setViewing(null)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(0, 0, 0, 0.9)'
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setViewing(null)}
-            aria-label="Cerrar"
-            style={{
-              position: 'absolute', top: 'calc(12px + env(safe-area-inset-top, 0px))', right: '12px',
-              background: 'rgba(255, 255, 255, 0.15)', border: 'none', borderRadius: '50%',
-              padding: '8px', color: '#fff', cursor: 'pointer'
-            }}
-          >
-            <X size={20} />
-          </button>
-          <img src={viewing.url} alt={viewing.name} style={{ maxWidth: '100%', maxHeight: '85dvh', objectFit: 'contain' }} />
-          <div style={{ marginTop: '8px', fontSize: '0.75rem', color: '#cbd5e1', textAlign: 'center' }}>
-            {viewing.name}
-          </div>
-        </div>,
-        document.body
-      )}
+      {/* Visor a pantalla completa: galería con todas las fotos ya descargadas */}
+      {viewing?.url && (() => {
+        const ready = photos.filter(p => p.url);
+        return (
+          <ImageViewer
+            images={ready.map(p => ({ src: p.url!, alt: p.name }))}
+            initialIndex={Math.max(0, ready.findIndex(p => p.id === viewing.id))}
+            onClose={() => setViewing(null)}
+          />
+        );
+      })()}
     </div>
   );
 };

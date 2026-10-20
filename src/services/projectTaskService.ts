@@ -9,7 +9,8 @@
 //     inicio real = el primer hito concluido; fin real = el último, cuando ya concluyeron todos
 //     avance = promedio de sus hijos; estado = New / Processing / Closed según sus hijos
 // - Proyecto: el fin previsto es la fecha más tardía de sus tareas; al concluir el último hito
-//   toma la fecha de fin real y pasa a cerrado.
+//   toma la fecha de fin real y pasa a cerrado. Si después se le crean tareas nuevas, se reabre
+//   (Processing, sin fecha de fin real).
 // Los cálculos se guardan en GLPI (syncRollups) al abrir el proyecto y tras cada cambio, así que
 // también reflejan las tareas creadas o cambiadas desde GLPI.
 
@@ -208,7 +209,7 @@ export class ProjectTaskService {
    * Calcula (sin guardar) lo que debe cambiar en las tareas padre y en el proyecto según las
    * reglas de arriba. Solo se incluyen los campos que realmente cambian.
    */
-  static computeRollups(tasks: GLPIProjectTask[], project: ProjectSnapshot, ids: ProjectStateIds): RollupPlan {
+  static computeRollups(tasks: GLPIProjectTask[], project: ProjectSnapshot, ids: ProjectStateIds, options: { reopenIfPending?: boolean } = {}): RollupPlan {
     const byId = new Map(tasks.map(t => [t.id, { ...t }]));
     const children = new Map<number, number[]>();
     byId.forEach(t => {
@@ -276,6 +277,10 @@ export class ProjectTaskService {
       const realEnd = maxDate(roots.map(r => r.realEnd));
       if (realEnd && realEnd !== project.real_end_date) projectChanges.real_end_date = realEnd;
       if (project.projectstates_id !== ids.closedId) projectChanges.projectstates_id = ids.closedId;
+    } else if (options.reopenIfPending && project.projectstates_id === ids.closedId) {
+      // Se crearon tareas en un proyecto cerrado: vuelve a estar en proceso
+      projectChanges.projectstates_id = ids.processingId;
+      projectChanges.real_end_date = null;
     }
 
     // Las tareas con cambios conservan el auto_percent_done en 0: el avance lo pone la app
@@ -291,7 +296,12 @@ export class ProjectTaskService {
    * otra para el proyecto, solo si algo cambió). Devuelve las tareas ya calculadas y el fin
    * previsto vigente del proyecto.
    */
-  static async syncRollups(session: GLPISession, projectId: number, tasks: GLPIProjectTask[]): Promise<{ tasks: GLPIProjectTask[]; planEnd: string | null; projectClosed: boolean }> {
+  static async syncRollups(
+    session: GLPISession,
+    projectId: number,
+    tasks: GLPIProjectTask[],
+    options: { reopenIfPending?: boolean } = {}
+  ): Promise<{ tasks: GLPIProjectTask[]; planEnd: string | null; projectClosed: boolean; projectReopened: boolean }> {
     const ids = await this.getStateIds(session);
     let project: ProjectSnapshot = { plan_end_date: null, real_end_date: null, projectstates_id: 0 };
     if (!session.isMock) {
@@ -302,7 +312,7 @@ export class ProjectTaskService {
       }
     }
 
-    const plan = this.computeRollups(tasks, project, ids);
+    const plan = this.computeRollups(tasks, project, ids, options);
     if (session.isMock) {
       const mock = GLPIService.mockProjectTasks(projectId);
       plan.tasks.forEach(t => { const found = mock.find(m => m.id === t.id); if (found) Object.assign(found, t); });
@@ -322,7 +332,8 @@ export class ProjectTaskService {
     return {
       tasks: plan.tasks,
       planEnd: (plan.projectChanges.plan_end_date as string | undefined) ?? project.plan_end_date ?? maxDate(plan.tasks.map(t => t.plan_end_date || t.plan_start_date)),
-      projectClosed: plan.projectChanges.projectstates_id === ids.closedId
+      projectClosed: plan.projectChanges.projectstates_id === ids.closedId,
+      projectReopened: plan.projectChanges.projectstates_id === ids.processingId
     };
   }
 }
