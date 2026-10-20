@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GLPISession } from '../types/glpi';
-import {
-  NotificationService, reminderTime, LATE_MS, OFFSETS_CHANGED_EVENT,
-  type AppNotification, type TaskReminder
-} from '../services/notificationService';
+import { NotificationService, OFFSETS_CHANGED_EVENT, type AppNotification, type TaskReminder } from '../services/notificationService';
+import { dueReminder } from '../services/reminderRules';
 import { prepareNotificationSound, playNotificationSound } from '../services/notificationSound';
 import { showDeviceNotification } from '../services/deviceNotifications';
 
@@ -87,20 +85,11 @@ export const useTaskReminders = (session: GLPISession | null) => {
       const now = Date.now();
       const fired: AppNotification[] = [];
       upcoming.forEach(task => {
-        const start = reminderTime(task.start);
-        const due = offsets.filter(offset => (offset === 0
-          ? now >= start && now < start + LATE_MS
-          : now >= start - offset * 60_000 && now < start));
-        if (due.length === 0) return;
-        const offset = Math.min(...due);
-        const id = `${task.taskId}:${offset}:${task.start}`;
-        if (firedIds.current.has(id)) return;
+        const due = dueReminder(task, offsets, now);
+        if (!due || firedIds.current.has(due.notification.id)) return;
         // Los avisos anteriores de la misma tarea que ya no tiene caso mostrar
-        due.forEach(o => firedIds.current.add(`${task.taskId}:${o}:${task.start}`));
-        // Si el aviso sale tarde (p. ej. la tarea se creó poco antes de empezar), dice lo que de
-        // verdad falta, no la anticipación configurada
-        const remaining = Math.max(1, Math.ceil((start - now) / 60_000));
-        fired.push({ ...task, id, kind: offset === 0 ? 'now' : 'soon', offsetMin: offset === 0 ? 0 : Math.min(offset, remaining), firedAt: now, read: false });
+        due.dueIds.forEach(id => firedIds.current.add(id));
+        fired.push(due.notification);
       });
       if (fired.length === 0) return;
       persist(list => [...fired, ...list]);

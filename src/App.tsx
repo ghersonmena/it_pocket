@@ -23,6 +23,8 @@ import { NotificationBanners } from './components/NotificationBanners';
 import { NotificationsScreen } from './components/NotificationsScreen';
 import type { TaskReminder } from './services/notificationService';
 import { OPEN_TASK_MESSAGE } from './services/deviceNotifications';
+import { refreshPushSubscription, unsubscribePush } from './services/pushClient';
+import { NotificationService } from './services/notificationService';
 import type { SlideDirection } from './hooks/useSwipeNavigation';
 
 // Orden de los módulos en la barra inferior; deslizar avanza o retrocede en este orden
@@ -177,6 +179,8 @@ export const App: React.FC = () => {
 
   const handleLogout = async () => {
     if (session) {
+      // Este teléfono deja de recibir los avisos push de quien cierra sesión
+      await unsubscribePush(session).catch(() => {});
       try {
         await GLPIService.killSession(session);
       } catch (e) {
@@ -212,6 +216,11 @@ export const App: React.FC = () => {
     navigator.serviceWorker.addEventListener('message', onMessage);
     return () => navigator.serviceWorker.removeEventListener('message', onMessage);
   }, []);
+  // Avisos con la app cerrada: renovar la suscripción de este teléfono al abrir la app
+  useEffect(() => {
+    if (session) refreshPushSubscription(session, NotificationService.getOffsets(session));
+  }, [session]);
+
   useEffect(() => {
     if (!session) return;
     const params = new URLSearchParams(window.location.search);

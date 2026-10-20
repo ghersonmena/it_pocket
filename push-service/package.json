@@ -1,0 +1,19 @@
+{
+  "name": "itpocket-push",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Servicio opcional de ITPocket: avisos de tareas por Web Push aunque la app esté cerrada",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "setup": "tsx src/setup.ts",
+    "typecheck": "../node_modules/.bin/tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "tsx": "4.23.15",
+    "web-push": "3.6.7"
+  },
+  "devDependencies": {
+    "@types/web-push": "3.6.4"
+  }
+}

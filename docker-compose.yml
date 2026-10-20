@@ -19,3 +19,19 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+
+  # Avisos con la app cerrada (Web Push). OPCIONAL: sin el token del usuario de servicio arranca
+  # desactivado y la app funciona igual. Configurar: docker compose run --rm push npm run setup
+  push:
+    build:
+      context: .
+      dockerfile: push-service/Dockerfile
+    container_name: glpi_mobile_push
+    env_file:
+      - .env
+    environment:
+      # Zona horaria de GLPI (las fechas de las tareas están en hora local)
+      TZ: ${PUSH_TZ:-America/Mexico_City}
+    volumes:
+      - ./push-data:/data
+    restart: unless-stopped

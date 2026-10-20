@@ -8,3 +8,6 @@ dist
 
 # Certificados SSL: se montan como volumen, no van dentro de la imagen
 certs
+
+# Datos del servicio push (suscripciones y llaves): volumen, no van en la imagen
+push-data

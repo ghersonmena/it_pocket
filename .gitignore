@@ -38,3 +38,6 @@ certs/*
 
 # Archivos del OCR copiados desde node_modules (scripts/copy-ocr-assets.mjs)
 public/ocr/
+
+# Datos del servicio push (suscripciones, llaves VAPID, token del usuario de servicio)
+push-data

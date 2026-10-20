@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { GLPISession } from '../types/glpi';
 import { NotificationService, PRESET_OFFSETS, formatOffset } from '../services/notificationService';
 import {
   getDevicePermission, isIosBrowser, isDeviceNotificationEnabled, setDeviceNotificationEnabled,
   requestDevicePermission, showTestDeviceNotification, type DevicePermission
 } from '../services/deviceNotifications';
-import { BellRing, Plus, X, Smartphone, Send } from 'lucide-react';
+import { getPushStatus, isPushSubscribed, subscribePush, unsubscribePush, updatePushOffsets, type PushStatus } from '../services/pushClient';
+import { BellRing, Plus, X, Smartphone, Send, CloudLightning, RefreshCw } from 'lucide-react';
 
 interface NotificationSettingsProps {
   session: GLPISession;
@@ -45,11 +46,41 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ sess
   const [permission, setPermission] = useState<DevicePermission>(getDevicePermission);
   const [deviceOn, setDeviceOn] = useState<boolean>(isDeviceNotificationEnabled);
   const [message, setMessage] = useState<string>('');
+  // Avisos con la app cerrada (solo si el servidor tiene el servicio push)
+  const [push, setPush] = useState<PushStatus>({ enabled: false, publicKey: null });
+  const [pushOn, setPushOn] = useState<boolean>(() => isPushSubscribed(session));
+  const [pushBusy, setPushBusy] = useState<boolean>(false);
+  const [pushError, setPushError] = useState<string>('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getPushStatus(session).then(status => { if (!cancelled) setPush(status); });
+    return () => { cancelled = true; };
+  }, [session]);
+
+  const togglePush = async () => {
+    setPushBusy(true);
+    setPushError('');
+    try {
+      if (pushOn) {
+        await unsubscribePush(session);
+        setPushOn(false);
+      } else if (push.publicKey) {
+        await subscribePush(session, push.publicKey, offsets);
+        setPushOn(true);
+      }
+    } catch (err: any) {
+      setPushError(err.message || 'No se pudo activar el aviso con la app cerrada.');
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   const save = (next: number[]) => {
     const clean = [...new Set(next)].sort((a, b) => b - a);
     setOffsets(clean);
     NotificationService.setOffsets(session, clean);
+    updatePushOffsets(session, clean); // el servidor push usa los mismos tiempos
   };
   const toggle = (minutes: number) => save(offsets.includes(minutes) ? offsets.filter(o => o !== minutes) : [...offsets, minutes]);
 
@@ -176,8 +207,27 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ sess
             <Send size={14} /> Probar notificación
           </button>
         )}
+        {push.enabled && permission === 'granted' && (
+          <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed var(--border-color)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <CloudLightning size={20} color={pushOn ? 'var(--primary)' : 'var(--text-muted)'} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>Avisar con la app cerrada</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                  {pushOn ? 'El servidor te avisa aunque la app esté cerrada' : 'El servidor manda el aviso a este teléfono aunque la app esté cerrada'}
+                </div>
+              </div>
+              {pushBusy ? <RefreshCw size={18} className="spin" color="var(--text-muted)" /> : <Switch on={pushOn} label="Avisar con la app cerrada" onToggle={togglePush} />}
+            </div>
+            {pushError && <div style={{ marginTop: '6px', fontSize: '0.76rem', fontWeight: 600, color: '#dc2626' }}>{pushError}</div>}
+          </div>
+        )}
         <div style={{ marginTop: '10px', fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-          Los avisos solo se generan con la app abierta: al minimizarla, el teléfono la congela en pocos minutos y el aviso sale hasta que vuelves a ella.
+          {push.enabled && pushOn
+            ? 'Con "Avisar con la app cerrada" activo, los avisos llegan aunque la app esté cerrada (con conexión a internet).'
+            : push.enabled
+              ? 'Sin "Avisar con la app cerrada", los avisos solo se generan con la app abierta: al minimizarla, el teléfono la congela en pocos minutos.'
+              : 'Los avisos solo se generan con la app abierta: al minimizarla, el teléfono la congela en pocos minutos y el aviso sale hasta que vuelves a ella.'}
         </div>
       </div>
     </div>

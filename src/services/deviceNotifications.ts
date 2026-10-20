@@ -2,7 +2,7 @@
 // abierta o en segundo plano. Usa el service worker (public/sw.js), que es lo que exigen Android
 // y iOS. En iPhone solo existen con la app instalada en la pantalla de inicio (iOS 16.4+).
 
-import { reminderTitle, type AppNotification } from './notificationService';
+import { notificationText, type AppNotification } from './reminderRules';
 
 const PREF_KEY = 'itpocket_device_notifications';
 export const OPEN_TASK_MESSAGE = 'itpocket:open-task';
@@ -64,8 +64,9 @@ const show = async (title: string, options: NotificationOptions): Promise<boolea
 /** Muestra el aviso como notificación del sistema (con su sonido); false si no se pudo o están desactivadas. */
 export const showDeviceNotification = (n: AppNotification): Promise<boolean> => {
   if (!isDeviceNotificationEnabled()) return Promise.resolve(false);
-  return show(`${reminderTitle(n)} · ${n.taskName}`, {
-    body: `${n.parentName ? `${n.parentName} · ` : ''}${n.projectName}${n.asAdmin ? '\nSin responsable: te avisamos como administrador' : ''}`,
+  const { title, body } = notificationText(n);
+  return show(title, {
+    body,
     tag: n.id,
     data: { id: n.id, taskId: n.taskId, projectId: n.projectId, projectName: n.projectName }
   });
