@@ -6,6 +6,7 @@ import { RefreshCw, Send, MessageSquare } from 'lucide-react';
 interface TaskNotesProps {
   session: GLPISession;
   taskId: number;
+  itemtype?: 'ProjectTask' | 'Project'; // notas de la tarea (por defecto) o del proyecto
   indent: number;
   onCountChange?: (count: number) => void;
 }
@@ -22,8 +23,8 @@ const formatDate = (value: string): string => {
   });
 };
 
-// Historial de notas (Notepad de GLPI) de un hito, con formulario para agregar una nueva
-export const TaskNotes: React.FC<TaskNotesProps> = ({ session, taskId, indent, onCountChange }) => {
+// Historial de notas (Notepad de GLPI) de una tarea o del proyecto, con formulario para agregar una nueva
+export const TaskNotes: React.FC<TaskNotesProps> = ({ session, taskId, itemtype = 'ProjectTask', indent, onCountChange }) => {
   const [notes, setNotes] = useState<GLPINote[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +37,7 @@ export const TaskNotes: React.FC<TaskNotesProps> = ({ session, taskId, indent, o
 
   useEffect(() => {
     let cancelled = false;
-    GLPIService.getTaskNotes(session, taskId)
+    GLPIService.getTaskNotes(session, taskId, itemtype)
       .then(data => {
         if (cancelled) return;
         setNotes(data);
@@ -49,7 +50,7 @@ export const TaskNotes: React.FC<TaskNotesProps> = ({ session, taskId, indent, o
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [session, taskId]);
+  }, [session, taskId, itemtype]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +60,7 @@ export const TaskNotes: React.FC<TaskNotesProps> = ({ session, taskId, indent, o
     setSaving(true);
     setError(null);
     try {
-      const note = await GLPIService.addTaskNote(session, taskId, text);
+      const note = await GLPIService.addTaskNote(session, taskId, text, itemtype);
       const next = [note, ...notes];
       setNotes(next);
       onCountChange?.(next.length);
@@ -87,7 +88,7 @@ export const TaskNotes: React.FC<TaskNotesProps> = ({ session, taskId, indent, o
         <textarea
           value={draft}
           onChange={e => setDraft(e.target.value)}
-          placeholder="Escribe una nota para el historial de este hito..."
+          placeholder={`Escribe una nota para el historial de ${itemtype === 'Project' ? 'este proyecto' : 'esta tarea'}...`}
           rows={2}
           disabled={saving}
           style={{

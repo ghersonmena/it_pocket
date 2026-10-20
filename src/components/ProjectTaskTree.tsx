@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { GLPISession, GLPIProject, GLPIProjectTask, ProjectTaskNode, TaskParticipant, LinkedElement } from '../types/glpi';
 import { GLPIService } from '../services/glpiService';
+import { ProjectTaskService } from '../services/projectTaskService';
+import { TaskFormView } from './TaskFormView';
+import { TaskDetailView } from './TaskDetailView';
 import { TaskNotes } from './TaskNotes';
 import { TaskPhotos } from './TaskPhotos';
 import { AssignParticipants } from './AssignParticipants';
@@ -25,7 +29,8 @@ import {
   Pencil,
   CalendarDays,
   Monitor,
-  Eye
+  Eye,
+  Plus
 } from 'lucide-react';
 
 const stripAccents = (s: string) =>
@@ -73,6 +78,20 @@ const parseGlpiDate = (value?: string): number | null => {
 const getSortDate = (node: ProjectTaskNode): number | null =>
   parseDateFromName(node.name) ?? parseGlpiDate(node.plan_start_date);
 
+type TreeView =
+  | { kind: 'tree' }
+  | { kind: 'new'; parent: { id: number; name: string } | null }
+  | { kind: 'task'; id: number };
+
+const findNode = (nodes: ProjectTaskNode[], id: number): ProjectTaskNode | null => {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    const found = findNode(node.children, id);
+    if (found) return found;
+  }
+  return null;
+};
+
 interface ProjectTaskTreeProps {
   session: GLPISession;
   project: GLPIProject;
@@ -111,6 +130,30 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
   const [viewingElements, setViewingElements] = useState<{ elements: LinkedElement[]; name: string } | null>(null);
   // Fin previsto del proyecto: la tarea que termina más tarde (undefined = calculando)
   const [planEnd, setPlanEnd] = useState<string | null | undefined>(undefined);
+  // Pantallas dentro del proyecto: árbol (pila vacía), nueva tarea o detalle de una tarea
+  const [viewStack, setViewStack] = useState<TreeView[]>([]);
+  const view: TreeView = viewStack[viewStack.length - 1] || { kind: 'tree' };
+  const pushView = (next: TreeView) => setViewStack(stack => [...stack, next]);
+  const popView = () => setViewStack(stack => stack.slice(0, -1));
+  const [projectNotesOpen, setProjectNotesOpen] = useState<boolean>(false);
+
+  const showToast = (msg: string, ms = 3500) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), ms);
+  };
+
+  // Fechas, duraciones, avance y estado de las tareas padre y del proyecto (se guardan en GLPI)
+  const runSync = async (tasks: GLPIProjectTask[]) => {
+    try {
+      const result = await ProjectTaskService.syncRollups(session, project.id, tasks);
+      setFlatTasks(result.tasks);
+      setPlanEnd(result.planEnd);
+      if (result.projectClosed) showToast('Se concluyó el último hito: el proyecto quedó cerrado con su fecha de fin real.', 5000);
+    } catch (err) {
+      console.warn('No se pudieron actualizar los cálculos del proyecto:', err);
+      setPlanEnd(prev => (prev === undefined ? null : prev));
+    }
+  };
 
   const fetchTasks = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -126,10 +169,8 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
       }
       setFlatTasks(data);
 
-      // Fin previsto = término de la tarea más tardía (se guarda en GLPI si cambió)
-      GLPIService.syncProjectPlanEnd(session, project.id, data)
-        .then(setPlanEnd)
-        .catch(err => { console.warn('No se pudo actualizar el fin previsto del proyecto:', err); setPlanEnd(null); });
+      // Cálculos automáticos (tareas padre, fin previsto y cierre del proyecto)
+      runSync(data);
 
       // Los nombres de los participantes llegan después, sin retrasar el árbol
       setParticipantsLoaded(false);
@@ -149,11 +190,12 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
       // La vista inicial debe mostrar los grupos del proyecto (por ejemplo, cada
       // jornada programada), no todas las actividades individuales de golpe.
       // El usuario puede abrir el grupo que necesite consultar.
-      const initialExpanded: Record<number, boolean> = {};
-      data.forEach(t => {
-        initialExpanded[t.id] = false;
+      // Al recargar se respeta lo que el usuario ya abrió; solo las tareas nuevas inician cerradas.
+      setExpandedNodes(prev => {
+        const next = { ...prev };
+        data.forEach(t => { if (!(t.id in next)) next[t.id] = false; });
+        return next;
       });
-      setExpandedNodes(initialExpanded);
     } catch (err) {
       console.warn('Error al cargar las tareas del proyecto:', err);
     } finally {
@@ -308,8 +350,8 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
   };
 
   // Acción de 1-Clic para Concluir Hito / Tarea
-  const handleToggleComplete = async (node: ProjectTaskNode, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleToggleComplete = async (node: ProjectTaskNode, e?: React.MouseEvent) => {
+    e?.stopPropagation();
 
     // Si ya está al 100%, opcionalmente no hacer nada o notificar
     if (node.percent_done === 100) {
@@ -323,20 +365,12 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
     try {
       const updated = await GLPIService.completeTaskMilestone(session, node.id, project.id);
 
-      // Actualizar estado plano local con lo mismo que se guardó en GLPI
-      setFlatTasks(prev => prev.map(t => {
-        if (t.id === node.id) {
-          return {
-            ...t,
-            percent_done: 100,
-            state: 3,
-            real_start_date: updated.real_start_date,
-            real_end_date: updated.real_end_date,
-            state_name: 'Concluida'
-          };
-        }
-        return t;
-      }));
+      // Actualizar estado plano local con lo mismo que se guardó en GLPI y recalcular hacia arriba
+      const next = flatTasks.map(t => (t.id === node.id
+        ? { ...t, percent_done: 100, state: 3, real_start_date: updated.real_start_date, state_name: 'Concluida' }
+        : t));
+      setFlatTasks(next);
+      await runSync(next);
 
       setToastMsg(`¡Hito "${node.name}" marcado al 100% y cerrado en GLPI!`);
       setTimeout(() => setToastMsg(null), 3500);
@@ -355,8 +389,11 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
     const isExpanded = expandedNodes[node.id] !== false; // por defecto expandido si no es false
     const isCompleted = node.percent_done === 100;
     const isUpdating = updatingTaskId === node.id;
-    // "Equipo" = tarea cuyos hijos son hitos (p. ej. MANTENIMIENTO DE EQUIPO DE X): ahí van las fotos
-    const isEquipment = hasChildren && node.children.some(child => child.is_milestone);
+    // "Equipo" = tarea de mantenimiento de un equipo (MANTENIMIENTO DE EQUIPO DE X, o con un activo
+    // relacionado) cuyos hijos son hitos: ahí van las fotos del mantenimiento. En las demás tareas
+    // las fotos se manejan desde su detalle.
+    const isEquipment = hasChildren && node.children.some(child => child.is_milestone)
+      && (!!taskElements[node.id] || /EQUIPO/i.test(node.name));
     // "Grupo" = agrupador de nivel superior (p. ej. MANTENIMIENTO PROGRAMADOS PARA <fecha>)
     const isGroup = hasChildren && !isEquipment;
 
@@ -367,7 +404,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
     return (
       <div key={node.id} style={{ marginBottom: '6px' }}>
         <div
-          onClick={() => hasChildren && toggleExpand(node.id)}
+          onClick={() => (hasChildren ? toggleExpand(node.id) : pushView({ kind: 'task', id: node.id }))}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -380,7 +417,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
             border: `1.5px solid ${isCompleted ? '#d1fae5' : 'var(--border-color)'}`,
             borderLeft: hasChildren ? `4px solid ${accentColor}` : `1.5px solid ${isCompleted ? '#d1fae5' : 'var(--border-color)'}`,
             borderRadius: 'var(--radius-md)',
-            cursor: hasChildren ? 'pointer' : 'default',
+            cursor: 'pointer',
             boxShadow: hasChildren ? 'var(--shadow-sm)' : 'none',
             transition: 'all 0.2s ease',
             position: 'relative'
@@ -605,19 +642,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
               </button>
             )}
 
-            {hasChildren ? (
-              <span
-                className="badge"
-                style={{
-                  background: isCompleted ? '#ecfdf5' : 'var(--primary-soft)',
-                  color: isCompleted ? '#059669' : 'var(--primary)',
-                  fontSize: '0.75rem',
-                  fontWeight: 700
-                }}
-              >
-                {isCompleted ? '✓ 100% Concluido' : `${node.percent_done}% (${node.children.length} sub-tareas)`}
-              </span>
-            ) : (
+            {hasChildren ? null : (
               <button
                 type="button"
                 onClick={(e) => handleToggleComplete(node, e)}
@@ -642,18 +667,26 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
                 {isUpdating ? (
                   <RefreshCw size={14} className="spin" />
                 ) : isCompleted ? (
-                  <>
-                    <CheckCircle2 size={14} color="#10b981" />
-                    <span>100% Concluido</span>
-                  </>
+                  <CheckCircle2 size={16} color="#10b981" aria-label="Concluido" />
                 ) : (
                   <>
                     <Square size={14} />
-                    <span>{node.is_milestone ? 'Concluir Hito' : 'Concluir Tarea'}</span>
+                    <span>Concluir</span>
                   </>
                 )}
               </button>
             )}
+
+            {/* Detalle: descripción, fechas, subtareas, notas, fotos y documentos */}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); pushView({ kind: 'task', id: node.id }); }}
+              title="Ver detalle"
+              aria-label={`Ver detalle de ${node.name}`}
+              style={{ display: 'inline-flex', padding: '6px 2px', border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+            >
+              <ChevronRight size={18} />
+            </button>
           </div>
         </div>
 
@@ -694,8 +727,67 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
     );
   };
 
+  const detailNode = view.kind === 'task' ? findNode(treeNodes, view.id) : null;
+  const parentOf = (node: ProjectTaskNode) => flatTasks.find(t => t.id === node.projecttasks_id);
+  const fab = view.kind === 'tree' && !loading && document.querySelector('.mobile-app-wrapper')
+    ? createPortal(
+      <button type="button" className="fab" onClick={() => pushView({ kind: 'new', parent: null })} aria-label="Nueva tarea" title="Nueva tarea">
+        <Plus size={28} strokeWidth={2.5} />
+      </button>,
+      document.querySelector('.mobile-app-wrapper')!
+    )
+    : null;
+
   return (
-    <div className="animate-fade-in" style={{ paddingBottom: '20px' }}>
+    <>
+    {fab}
+    {view.kind === 'new' && (
+      <TaskFormView
+        session={session}
+        projectId={project.id}
+        parent={view.parent}
+        onBack={popView}
+        onCreated={async () => {
+          const parentId = view.parent?.id;
+          popView();
+          if (parentId) setExpandedNodes(prev => ({ ...prev, [parentId]: true }));
+          showToast(parentId ? 'Subtarea creada en GLPI.' : 'Tarea creada en GLPI.');
+          await fetchTasks(true);
+        }}
+      />
+    )}
+    {view.kind === 'task' && (detailNode ? (
+      <>
+        {toastMsg && (
+          <div className="alert-box alert-info animate-fade-in" style={{ boxShadow: 'var(--shadow-lg)' }}>
+            <Sparkles size={18} style={{ color: 'var(--primary)' }} />
+            <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>{toastMsg}</div>
+          </div>
+        )}
+        <TaskDetailView
+          key={detailNode.id}
+          session={session}
+          node={detailNode}
+          backLabel={viewStack.length > 1 && viewStack[viewStack.length - 2].kind === 'task' ? (parentOf(detailNode)?.name || 'Tarea') : 'Tareas del proyecto'}
+          participants={participantsLoaded ? participants[detailNode.id] || [] : undefined}
+          hasElement={!!taskElements[detailNode.id]}
+          completing={updatingTaskId === detailNode.id}
+          onBack={popView}
+          onOpenTask={id => pushView({ kind: 'task', id })}
+          onAddSubtask={node => pushView({ kind: 'new', parent: { id: node.id, name: node.name } })}
+          onComplete={node => handleToggleComplete(node)}
+          onAssign={node => setAssigningNode(node)}
+          onViewElement={node => setViewingElements({ elements: [taskElements[node.id]], name: node.name })}
+          onSaved={() => fetchTasks(true)}
+        />
+      </>
+    ) : (
+      <div className="card" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+        <p style={{ marginBottom: '12px' }}>Esta tarea ya no está en el proyecto.</p>
+        <button type="button" className="btn-secondary" onClick={() => setViewStack([])}>Volver a las tareas</button>
+      </div>
+    ))}
+    <div className="animate-fade-in" style={{ paddingBottom: '20px', display: view.kind === 'tree' ? undefined : 'none' }}>
       {/* Encabezado con navegación de regreso */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
         <button
@@ -780,7 +872,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
             type="button"
             onClick={() => setViewingElements({ elements: projectElements, name: projectName })}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '8px',
+              display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '8px', marginRight: '6px',
               padding: '6px 10px', borderRadius: '10px', border: '1px solid rgba(139, 92, 246, 0.4)',
               background: 'rgba(139, 92, 246, 0.08)', color: '#8b5cf6', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer'
             }}
@@ -789,6 +881,20 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
             {projectElements.length === 1 ? 'Ver elemento relacionado' : `Ver ${projectElements.length} elementos relacionados`}
           </button>
         )}
+
+        <button
+          type="button"
+          onClick={() => setProjectNotesOpen(open => !open)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '8px', marginRight: '6px',
+            padding: '6px 10px', borderRadius: '10px', border: '1px solid var(--border-color)',
+            background: projectNotesOpen ? 'var(--primary-soft)' : 'var(--card-bg)', color: projectNotesOpen ? 'var(--primary)' : 'var(--text-muted)',
+            fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer'
+          }}
+        >
+          <MessageSquare size={14} /> Notas del proyecto
+        </button>
+        {projectNotesOpen && <TaskNotes session={session} taskId={project.id} itemtype="Project" indent={0} />}
 
         {/* Barra de progreso global del Proyecto */}
         <div style={{ marginTop: '10px' }}>
@@ -820,7 +926,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
       {/* Barra de Controles para Expandir/Colapsar todo */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', padding: '0 4px' }}>
         <h4 style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-main)' }}>
-          Programación de tareas ({treeNodes.length} grupos)
+          Tareas del proyecto ({treeNodes.length})
         </h4>
 
         <div style={{ display: 'flex', gap: '6px' }}>
@@ -878,9 +984,11 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
             if (name !== original?.name) changes.name = name;
             if (parentId !== undefined && parentId !== (original?.projecttasks_id || 0)) changes.projecttasks_id = parentId;
             await GLPIService.updateProjectTask(session, editingNode.id, changes);
-            setFlatTasks(prev => prev.map(t => (
+            const next = flatTasks.map(t => (
               t.id === editingNode.id ? { ...t, ...changes, parent_name_ref: '' } : t
-            )));
+            ));
+            setFlatTasks(next);
+            if (changes.projecttasks_id !== undefined) await runSync(next);
             // Si se movió, abrir el nuevo padre para que se vea dónde quedó
             if (changes.projecttasks_id) {
               setExpandedNodes(prev => ({ ...prev, [changes.projecttasks_id!]: true }));
@@ -923,7 +1031,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
         </div>
       ) : treeNodes.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
-          No hay tareas registradas para este proyecto.
+          No hay tareas registradas para este proyecto. Toca el botón + para crear la primera.
         </div>
       ) : (
         <div>
@@ -931,5 +1039,6 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
         </div>
       )}
     </div>
+    </>
   );
 };

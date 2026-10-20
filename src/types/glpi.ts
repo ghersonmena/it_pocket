@@ -117,6 +117,9 @@ export interface GLPIProjectTask {
   real_start_date?: string;
   real_end_date?: string;
   state_name?: string;
+  projectstates_id?: number;
+  planned_duration?: number;   // segundos
+  effective_duration?: number; // segundos
 }
 
 export interface ProjectTaskNode extends GLPIProjectTask {
@@ -140,6 +143,7 @@ export interface GLPITaskPhoto {
   filename: string;
   date: string;
   categoryId?: number; // documentcategories_id (Previo / Post mantenimiento)
+  mime?: string;
   url?: string; // object URL local para mostrar la imagen (se descarga con la sesión)
 }
 

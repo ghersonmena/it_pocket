@@ -635,14 +635,14 @@ export class GLPIService {
   }
 
   /** "YYYY-MM-DDTHH:MM" (input datetime-local) → "YYYY-MM-DD HH:MM:00" de GLPI; vacío → null. */
-  private static inputToGlpiDateTime(value: string): string | null {
+  static inputToGlpiDateTime(value: string): string | null {
     return value ? `${value.replace('T', ' ').slice(0, 16)}:00` : null;
   }
 
   /**
    * Crea la cabecera de un proyecto. La fecha del proyecto es el momento de creación, el avance
    * se calcula solo a partir de las tareas (auto_percent_done), el fin previsto lo da la tarea
-   * que termina más tarde (syncProjectPlanEnd) y la fecha de fin real no se captura. Los integrantes se registran en el equipo del proyecto (ProjectTeam).
+   * que termina más tarde (ProjectTaskService.syncRollups) y la fecha de fin real no se captura. Los integrantes se registran en el equipo del proyecto (ProjectTeam).
    */
   static async createProject(session: GLPISession, form: ProjectHeaderForm): Promise<GLPIProject> {
     const now = this.toGlpiDateTime(new Date());
@@ -675,7 +675,7 @@ export class GLPIService {
       percent_done: 0,
       auto_percent_done: 1,
       plan_start_date: this.inputToGlpiDateTime(form.plan_start_date),
-      // plan_end_date queda vacío: lo calcula syncProjectPlanEnd con las tareas
+      // plan_end_date queda vacío: lo calcula ProjectTaskService.syncRollups con las tareas
       real_start_date: this.inputToGlpiDateTime(form.real_start_date),
       content: form.content.trim() ? this.plainTextToHtml(form.content.trim()) : ''
     };
@@ -711,25 +711,6 @@ export class GLPIService {
       date_mod: now,
       state_name: ''
     };
-  }
-
-  /**
-   * Fin previsto del proyecto = la fecha de término prevista más tardía de sus tareas (de
-   * cualquier nivel). Se recalcula al abrir el proyecto, así que también toma en cuenta las
-   * tareas creadas o cambiadas desde GLPI; si cambió, se guarda en el proyecto. Si ninguna
-   * tarea tiene fecha de término, el proyecto se deja como está. Devuelve el fin previsto vigente.
-   */
-  static async syncProjectPlanEnd(session: GLPISession, projectId: number, tasks: GLPIProjectTask[]): Promise<string | null> {
-    const latest = tasks.map(t => t.plan_end_date || '').filter(Boolean).sort().at(-1) || null;
-    if (session.isMock) return latest;
-
-    const headers = { 'Content-Type': 'application/json', 'App-Token': session.appToken, 'Session-Token': session.sessionToken };
-    const res = await fetch(`${session.baseUrl}/apirest.php/Project/${projectId}`, { headers });
-    if (!res.ok) return latest;
-    const current: string | null = (await res.json())?.plan_end_date || null;
-    if (!latest || latest === current) return current;
-    await this.putItem(session, 'Project', projectId, { plan_end_date: latest }, 'el fin previsto del proyecto');
-    return latest;
   }
 
   /**
@@ -828,11 +809,35 @@ export class GLPIService {
    * - Más allá del ID más alto conocido se sigue explorando hasta encontrar varios lotes vacíos
    *   seguidos (tareas creadas desde la última carga).
    */
+  private static taskScanCacheKey(session: GLPISession): string {
+    return `glpi_projecttask_scan:${session.baseUrl}`;
+  }
+
+  /**
+   * Recuerda los IDs de tareas creadas desde la app. GLPI no las incluye en el listado de quien
+   * las crea (solo en el de los integrantes de su equipo), así que sin esto la búsqueda por ID
+   * podría no llegar a ellas si antes hay un hueco grande de tareas borradas.
+   */
+  static rememberProjectTaskIds(session: GLPISession, ids: number[]): void {
+    if (session.isMock || ids.length === 0) return;
+    try {
+      const key = this.taskScanCacheKey(session);
+      const raw = localStorage.getItem(key);
+      const cached: { maxId: number; missing: number[] } = raw ? JSON.parse(raw) : { maxId: 0, missing: [] };
+      const created = new Set(ids);
+      localStorage.setItem(key, JSON.stringify({
+        maxId: Math.max(cached.maxId, ...ids),
+        missing: cached.missing.filter(id => !created.has(id))
+      }));
+    } catch { /* sin localStorage: la búsqueda explora sin caché */ }
+  }
+
   private static async fetchProjectTasksById(session: GLPISession, minMaxId: number): Promise<any[]> {
     const batchSize = 25;
     const tailBatchSize = 10;
-    const emptyTailBatchesToStop = 2;
-    const cacheKey = `glpi_projecttask_scan:${session.baseUrl}`;
+    // Huecos de IDs por tareas borradas: se toleran hasta 30 IDs seguidos inexistentes
+    const emptyTailBatchesToStop = 3;
+    const cacheKey = this.taskScanCacheKey(session);
     const headers = {
       'Content-Type': 'application/json',
       'App-Token': session.appToken,
@@ -1017,7 +1022,10 @@ export class GLPIService {
       plan_end_date: item.plan_end_date,
       real_start_date: item.real_start_date,
       real_end_date: item.real_end_date,
-      state_name: item.state_name || (Number(item.percent_done) === 100 ? 'Concluida' : 'En proceso')
+      state_name: item.state_name || (Number(item.percent_done) === 100 ? 'Concluida' : 'En proceso'),
+      projectstates_id: Number(item.projectstates_id) || 0,
+      planned_duration: Number(item.planned_duration) || 0,
+      effective_duration: Number(item.effective_duration) || 0
     };
   }
 
@@ -1034,14 +1042,15 @@ export class GLPIService {
     // DOMParser no ejecuta scripts ni carga recursos: solo se usa para extraer texto
     const textOf = (value: string) =>
       new DOMParser().parseFromString(value, 'text/html').documentElement.textContent || '';
-    // Si las etiquetas vienen escapadas ("&lt;p&gt;"), primero se decodifican
-    const source = /&lt;[a-z/]/i.test(html) ? textOf(html) : html;
+    // Si las etiquetas vienen escapadas ("&lt;p&gt;" o "&#60;p&#62;", como guarda GLPI 10 los
+    // campos de texto enriquecido), primero se decodifican
+    const source = /&(lt|#60);[a-z/]/i.test(html) ? textOf(html) : html;
     const withBreaks = source.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n');
     return textOf(withBreaks).replace(/\n{3,}/g, '\n\n').trim();
   }
 
   /** Texto plano → HTML seguro para GLPI (escapa caracteres y respeta saltos de línea). */
-  private static plainTextToHtml(text: string): string {
+  static plainTextToHtml(text: string): string {
     const escaped = text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -1068,13 +1077,14 @@ export class GLPIService {
    * Notas (Notepad) de una tarea de proyecto, de la más reciente a la más antigua.
    * Las notas se guardan como registros independientes en GLPI, así que forman un historial.
    */
-  static async getTaskNotes(session: GLPISession, taskId: number): Promise<GLPINote[]> {
+  /** Notas de una tarea (o del proyecto, con itemtype 'Project'). No se heredan entre niveles. */
+  static async getTaskNotes(session: GLPISession, taskId: number, itemtype: 'ProjectTask' | 'Project' = 'ProjectTask'): Promise<GLPINote[]> {
     if (session.isMock) {
-      return [...(MOCK_TASK_NOTES[taskId] || [])].sort((a, b) => b.date.localeCompare(a.date));
+      return [...(MOCK_TASK_NOTES[itemtype === 'Project' ? -taskId : taskId] || [])].sort((a, b) => b.date.localeCompare(a.date));
     }
 
     const response = await fetch(
-      `${session.baseUrl}/apirest.php/ProjectTask/${taskId}/Notepad?expand_dropdowns=true&range=0-999`,
+      `${session.baseUrl}/apirest.php/${itemtype}/${taskId}/Notepad?expand_dropdowns=true&range=0-999`,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -1096,7 +1106,7 @@ export class GLPIService {
   }
 
   /** Agrega una nota a una tarea de proyecto. */
-  static async addTaskNote(session: GLPISession, taskId: number, text: string): Promise<GLPINote> {
+  static async addTaskNote(session: GLPISession, taskId: number, text: string, itemtype: 'ProjectTask' | 'Project' = 'ProjectTask'): Promise<GLPINote> {
     const nowStr = this.toGlpiDateTime(new Date());
 
     if (session.isMock) {
@@ -1106,7 +1116,7 @@ export class GLPIService {
         date: nowStr,
         user_name: session.username || 'Usuario Demo'
       };
-      (MOCK_TASK_NOTES[taskId] ||= []).push(note);
+      (MOCK_TASK_NOTES[itemtype === 'Project' ? -taskId : taskId] ||= []).push(note);
       return note;
     }
 
@@ -1119,7 +1129,7 @@ export class GLPIService {
       },
       body: JSON.stringify({
         input: {
-          itemtype: 'ProjectTask',
+          itemtype,
           items_id: taskId,
           content: this.plainTextToHtml(text)
         }
@@ -1180,8 +1190,19 @@ export class GLPIService {
    * monitor...), de la más reciente a la más antigua.
    */
   static async getItemPhotos(session: GLPISession, itemtype: string, itemId: number): Promise<GLPITaskPhoto[]> {
+    return this.getItemDocumentsOfKind(session, itemtype, itemId, 'image');
+  }
+
+  /** Documentos que no son imágenes (PDF, Office, etc.) ligados al elemento. */
+  static async getItemDocuments(session: GLPISession, itemtype: string, itemId: number): Promise<GLPITaskPhoto[]> {
+    return this.getItemDocumentsOfKind(session, itemtype, itemId, 'file');
+  }
+
+  private static async getItemDocumentsOfKind(session: GLPISession, itemtype: string, itemId: number, kind: 'image' | 'file'): Promise<GLPITaskPhoto[]> {
     if (session.isMock) {
-      return [...(MOCK_ITEM_PHOTOS[`${itemtype}#${itemId}`] || [])].sort((a, b) => b.date.localeCompare(a.date));
+      return [...(MOCK_ITEM_PHOTOS[`${itemtype}#${itemId}`] || [])]
+        .filter(d => (d.mime ? d.mime.startsWith('image/') : true) === (kind === 'image'))
+        .sort((a, b) => b.date.localeCompare(a.date));
     }
 
     const headers = {
@@ -1195,7 +1216,7 @@ export class GLPIService {
       { headers }
     );
     if (!linksRes.ok) {
-      throw new Error(`No se pudieron cargar las fotos (${linksRes.status})`);
+      throw new Error(`No se pudieron cargar ${kind === 'image' ? 'las fotos' : 'los documentos'} (${linksRes.status})`);
     }
     const links = await linksRes.json();
     if (!Array.isArray(links) || links.length === 0) return [];
@@ -1207,11 +1228,12 @@ export class GLPIService {
     }));
 
     return documents
-      .filter((doc: any) => doc && String(doc.mime || '').startsWith('image/'))
+      .filter((doc: any) => doc && String(doc.mime || '').startsWith('image/') === (kind === 'image'))
       .map((doc: any) => ({
         id: Number(doc.id),
-        name: doc.name || doc.filename || `Foto ${doc.id}`,
+        name: doc.name || doc.filename || `${kind === 'image' ? 'Foto' : 'Documento'} ${doc.id}`,
         filename: doc.filename || '',
+        mime: String(doc.mime || ''),
         date: doc.date_creation || doc.date_mod || '',
         categoryId: Number(doc.documentcategories_id) || undefined
       }))
@@ -1282,7 +1304,7 @@ export class GLPIService {
     const stamp = this.toGlpiDateTime(new Date());
 
     if (session.isMock) {
-      const entry: GLPITaskPhoto = { id: Date.now() + Math.floor(Math.random() * 1000), name, filename, date: stamp, categoryId, url: URL.createObjectURL(photo) };
+      const entry: GLPITaskPhoto = { id: Date.now() + Math.floor(Math.random() * 1000), name, filename, date: stamp, categoryId, mime: photo.type, url: URL.createObjectURL(photo) };
       (MOCK_ITEM_PHOTOS[`${itemtype}#${itemId}`] ||= []).push(entry);
       return entry;
     }
@@ -1660,7 +1682,7 @@ export class GLPIService {
   }
 
   /** Fecha/hora LOCAL en formato GLPI ("YYYY-MM-DD HH:MM:SS"). toISOString() daría UTC (+6 h en México). */
-  private static toGlpiDateTime(date: Date): string {
+  static toGlpiDateTime(date: Date): string {
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
       `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
@@ -1672,7 +1694,12 @@ export class GLPIService {
    * ID del estado de proyecto "terminado" (Closed). Se busca el ProjectState con
    * is_finished = 1 en vez de fijarlo en el código, porque el ID depende de cada instalación.
    */
-  private static async getClosedProjectStateId(session: GLPISession): Promise<number> {
+  /** Tareas demo de un proyecto (para crear tareas en modo demo). */
+  static mockProjectTasks(projectId: number): GLPIProjectTask[] {
+    return (MOCK_PROJECT_TASKS[projectId] ||= []);
+  }
+
+  static async getClosedProjectStateId(session: GLPISession): Promise<number> {
     const cached = this.closedStateIdCache.get(session.baseUrl);
     if (cached) return cached;
 
@@ -1702,8 +1729,9 @@ export class GLPIService {
   }
 
   /**
-   * Concluye un hito con 1 clic: percent_done = 100, estado Closed y marca de tiempo
-   * (real_start_date = real_end_date = momento del clic).
+   * Concluye un hito con 1 clic: percent_done = 100, estado Closed y su marca de tiempo en
+   * real_start_date. Un hito es un instante: no lleva fin real (las tareas padre calculan sus
+   * fechas reales a partir de estas marcas, ver ProjectTaskService.syncRollups).
    */
   static async completeTaskMilestone(session: GLPISession, taskId: number, currentProjectId: number = 1): Promise<GLPIProjectTask> {
     const nowStr = this.toGlpiDateTime(new Date());
@@ -1715,7 +1743,6 @@ export class GLPIService {
         found.percent_done = 100;
         found.state = 3;
         found.real_start_date = nowStr;
-        found.real_end_date = nowStr;
         found.state_name = 'Concluida';
         return { ...found };
       }
@@ -1733,11 +1760,10 @@ export class GLPIService {
         percent_done: 100,
         // El estado de una ProjectTask es projectstates_id; un campo "state" GLPI lo ignora
         projectstates_id: closedStateId,
-        // Un hito no tiene duración: inicio y fin reales son la marca de tiempo del cierre.
-        // No se toca plan_end_date: es la planificación original y sobrescribirla
-        // alteraba el orden de las tareas en el árbol.
-        real_start_date: nowStr,
-        real_end_date: nowStr
+        // Un hito es un instante: su marca de tiempo es el inicio real. No se toca
+        // plan_end_date: es la planificación original y sobrescribirla alteraba el orden
+        // de las tareas en el árbol.
+        real_start_date: nowStr
       }
     };
 
@@ -1762,7 +1788,6 @@ export class GLPIService {
       found.percent_done = 100;
       found.state = 3;
       found.real_start_date = nowStr;
-      found.real_end_date = nowStr;
       found.state_name = 'Concluida';
       return { ...found };
     }
@@ -1776,7 +1801,6 @@ export class GLPIService {
       is_milestone: true,
       state: 3,
       real_start_date: nowStr,
-      real_end_date: nowStr,
       state_name: 'Concluida'
     };
   }
