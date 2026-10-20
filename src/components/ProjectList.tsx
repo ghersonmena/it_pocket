@@ -1,14 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { GLPISession, GLPIProject } from '../types/glpi';
 import { GLPIService } from '../services/glpiService';
+import { ProjectFormView } from './ProjectFormView';
 import { Search, RefreshCw, FolderKanban, ChevronRight, Layers } from 'lucide-react';
 
 interface ProjectListProps {
   session: GLPISession;
   onSelectProject: (project: GLPIProject) => void;
+  newProjectRequest?: number;                 // cambia cada vez que se toca el botón "+"
+  onFormOpenChange?: (open: boolean) => void; // avisa si el formulario de nuevo proyecto está abierto
 }
 
-export const ProjectList: React.FC<ProjectListProps> = ({ session, onSelectProject }) => {
+export const ProjectList: React.FC<ProjectListProps> = ({ session, onSelectProject, newProjectRequest = 0, onFormOpenChange }) => {
+  const [creating, setCreating] = useState<boolean>(false);
+  const lastNewRequest = useRef(newProjectRequest);
+  useEffect(() => {
+    if (newProjectRequest === lastNewRequest.current) return;
+    lastNewRequest.current = newProjectRequest;
+    setCreating(true);
+  }, [newProjectRequest]);
+  useEffect(() => { onFormOpenChange?.(creating); }, [creating, onFormOpenChange]);
+  useEffect(() => () => onFormOpenChange?.(false), [onFormOpenChange]);
+
   const [projects, setProjects] = useState<GLPIProject[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -38,6 +51,17 @@ export const ProjectList: React.FC<ProjectListProps> = ({ session, onSelectProje
     (p.code && p.code.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (p.content && p.content.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  if (creating) {
+    return (
+      <ProjectFormView
+        session={session}
+        onBack={() => setCreating(false)}
+        // Al crearlo se abre el proyecto (al regresar, la lista se vuelve a cargar con él)
+        onCreated={project => { setCreating(false); onSelectProject(project); }}
+      />
+    );
+  }
 
   return (
     <div className="animate-fade-in">

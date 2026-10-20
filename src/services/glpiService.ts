@@ -1,4 +1,4 @@
-import type { GLPIAuthConfig, GLPISession, GLPITicket, GLPIFollowup, GLPIUserSessionInfo, GLPIProject, GLPIProjectTask, GLPINote, GLPITaskPhoto, PhotoCategory, TaskParticipant, GLPIUserOption, LinkedElement, ElementDetails } from '../types/glpi';
+import type { GLPIAuthConfig, GLPISession, GLPITicket, GLPIFollowup, GLPIUserSessionInfo, GLPIProject, GLPIProjectTask, GLPINote, GLPITaskPhoto, PhotoCategory, TaskParticipant, GLPIUserOption, LinkedElement, ElementDetails, ProjectHeaderForm, ProjectCatalogOption } from '../types/glpi';
 
 // Status labels & helper functions
 export const GLPI_STATUS_MAP: Record<number, { label: string; color: string; bg: string }> = {
@@ -610,6 +610,126 @@ export class GLPIService {
       console.warn('Error fetching real projects, falling back to mock:', err);
       return [...MOCK_PROJECTS];
     }
+  }
+
+  /**
+   * Estados de proyecto para crear uno: los del catálogo ProjectState de GLPI, sin los que
+   * marcan el proyecto como terminado (un proyecto nuevo no nace cerrado).
+   */
+  static async getOpenProjectStates(session: GLPISession): Promise<ProjectCatalogOption[]> {
+    if (session.isMock) return [{ id: 1, label: 'New' }, { id: 2, label: 'Processing' }];
+    const rows = await this.fetchAllPages(session, 'ProjectState');
+    return rows
+      .filter((r: any) => Number(r.is_finished) !== 1)
+      .map((r: any) => ({ id: Number(r.id), label: this.htmlToPlainText(String(r.name || `#${r.id}`)) }))
+      .sort((a, b) => a.id - b.id);
+  }
+
+  /** Tipos de proyecto (catálogo ProjectType de GLPI). */
+  static async getProjectTypes(session: GLPISession): Promise<ProjectCatalogOption[]> {
+    if (session.isMock) return [{ id: 1, label: 'MANTENIMIENTOS PROGRAMADOS' }, { id: 2, label: 'DESARROLLOS' }];
+    const rows = await this.fetchAllPages(session, 'ProjectType');
+    return rows
+      .map((r: any) => ({ id: Number(r.id), label: this.htmlToPlainText(String(r.name || `#${r.id}`)) }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'es'));
+  }
+
+  /** "YYYY-MM-DDTHH:MM" (input datetime-local) → "YYYY-MM-DD HH:MM:00" de GLPI; vacío → null. */
+  private static inputToGlpiDateTime(value: string): string | null {
+    return value ? `${value.replace('T', ' ').slice(0, 16)}:00` : null;
+  }
+
+  /**
+   * Crea la cabecera de un proyecto. La fecha del proyecto es el momento de creación, el avance
+   * se calcula solo a partir de las tareas (auto_percent_done), el fin previsto lo da la tarea
+   * que termina más tarde (syncProjectPlanEnd) y la fecha de fin real no se captura. Los integrantes se registran en el equipo del proyecto (ProjectTeam).
+   */
+  static async createProject(session: GLPISession, form: ProjectHeaderForm): Promise<GLPIProject> {
+    const now = this.toGlpiDateTime(new Date());
+    if (session.isMock) {
+      const project: GLPIProject = {
+        id: Math.max(0, ...MOCK_PROJECTS.map(p => p.id)) + 1,
+        name: form.name.trim(),
+        content: form.content.trim(),
+        percent_done: 0,
+        date: now,
+        date_mod: now,
+        state_name: 'New'
+      };
+      MOCK_PROJECTS.unshift(project);
+      return { ...project };
+    }
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'App-Token': session.appToken,
+      'Session-Token': session.sessionToken
+    };
+    const input: Record<string, unknown> = {
+      name: form.name.trim(),
+      date: now,
+      priority: form.priority,
+      projectstates_id: form.projectstates_id,
+      projecttypes_id: form.projecttypes_id,
+      users_id: form.users_id,
+      percent_done: 0,
+      auto_percent_done: 1,
+      plan_start_date: this.inputToGlpiDateTime(form.plan_start_date),
+      // plan_end_date queda vacío: lo calcula syncProjectPlanEnd con las tareas
+      real_start_date: this.inputToGlpiDateTime(form.real_start_date),
+      content: form.content.trim() ? this.plainTextToHtml(form.content.trim()) : ''
+    };
+    const res = await fetch(`${session.baseUrl}/apirest.php/Project`, { method: 'POST', headers, body: JSON.stringify({ input }) });
+    const body = await res.json().catch(() => null);
+    if (!res.ok || !body?.id) {
+      const detail = Array.isArray(body) ? body.slice(1).join(' ') : '';
+      throw new Error(`GLPI no creó el proyecto (${res.status})${detail ? `: ${detail}` : ''}`);
+    }
+    const projectId = Number(body.id);
+
+    // Integrantes: una fila de ProjectTeam por usuario, en una sola petición
+    const members = [...new Set(form.members)];
+    if (members.length > 0) {
+      const teamRes = await fetch(`${session.baseUrl}/apirest.php/ProjectTeam`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ input: members.map(id => ({ projects_id: projectId, itemtype: 'User', items_id: id })) })
+      });
+      const results = await teamRes.json().catch(() => null);
+      const failed = !teamRes.ok || (Array.isArray(results) && results.some((r: any) => !r?.id));
+      if (failed) {
+        throw new Error(`El proyecto #${projectId} se creó, pero no se pudieron registrar todos los integrantes (${teamRes.status}). Agrégalos desde GLPI.`);
+      }
+    }
+
+    return {
+      id: projectId,
+      name: form.name.trim(),
+      content: form.content.trim(),
+      percent_done: 0,
+      date: now,
+      date_mod: now,
+      state_name: ''
+    };
+  }
+
+  /**
+   * Fin previsto del proyecto = la fecha de término prevista más tardía de sus tareas (de
+   * cualquier nivel). Se recalcula al abrir el proyecto, así que también toma en cuenta las
+   * tareas creadas o cambiadas desde GLPI; si cambió, se guarda en el proyecto. Si ninguna
+   * tarea tiene fecha de término, el proyecto se deja como está. Devuelve el fin previsto vigente.
+   */
+  static async syncProjectPlanEnd(session: GLPISession, projectId: number, tasks: GLPIProjectTask[]): Promise<string | null> {
+    const latest = tasks.map(t => t.plan_end_date || '').filter(Boolean).sort().at(-1) || null;
+    if (session.isMock) return latest;
+
+    const headers = { 'Content-Type': 'application/json', 'App-Token': session.appToken, 'Session-Token': session.sessionToken };
+    const res = await fetch(`${session.baseUrl}/apirest.php/Project/${projectId}`, { headers });
+    if (!res.ok) return latest;
+    const current: string | null = (await res.json())?.plan_end_date || null;
+    if (!latest || latest === current) return current;
+    await this.putItem(session, 'Project', projectId, { plan_end_date: latest }, 'el fin previsto del proyecto');
+    return latest;
   }
 
   /**

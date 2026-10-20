@@ -13,6 +13,7 @@ interface SearchSelectProps {
   options: SelectOption[];
   loading?: boolean;
   disabled?: boolean;
+  placeholder?: string;   // texto cuando no hay valor (por defecto "Sin asignar")
   onChange: (id: number) => void;
 }
 
@@ -39,7 +40,7 @@ const normalize = (value: string) =>
   value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 // Campo de selección con buscador para desplegables de GLPI (ubicaciones, usuarios, fabricantes...)
-export const SearchSelect: React.FC<SearchSelectProps> = ({ label, value, options, loading, disabled, onChange }) => {
+export const SearchSelect: React.FC<SearchSelectProps> = ({ label, value, options, loading, disabled, placeholder = 'Sin asignar', onChange }) => {
   const [open, setOpen] = useState<boolean>(false);
   const [search, setSearch] = useState<string>('');
 
@@ -70,7 +71,7 @@ export const SearchSelect: React.FC<SearchSelectProps> = ({ label, value, option
         <span style={{ flex: 1, minWidth: 0, whiteSpace: 'normal' }}>
           {selected
             ? <HierarchicalLabel label={selected.label} color="var(--text-main)" />
-            : <span style={{ color: 'var(--text-muted)' }}>{value ? `#${value}` : 'Sin asignar'}</span>}
+            : <span style={{ color: 'var(--text-muted)' }}>{value ? `#${value}` : placeholder}</span>}
         </span>
         {loading ? <RefreshCw size={14} className="spin" /> : <ChevronDown size={16} color="var(--text-muted)" />}
       </button>

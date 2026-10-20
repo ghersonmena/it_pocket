@@ -91,6 +91,8 @@ export const App: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
   // Cada incremento pide a Activos abrir el alta de un activo nuevo (botón "+")
   const [newAssetRequest, setNewAssetRequest] = useState<number>(0);
+  const [projectFormOpen, setProjectFormOpen] = useState<boolean>(false);
+  const [newProjectRequest, setNewProjectRequest] = useState<number>(0);
 
   // Cambiar de módulo animando hacia el lado que corresponde según el orden de la barra
   const goToTab = (tab: TabType) => {
@@ -104,7 +106,8 @@ export const App: React.FC = () => {
   const swipe = useSwipeNavigation({
     // Solo en las pantallas principales; no dentro de un proyecto, ticket o formulario de activo
     enabled: !!session && !selectedProject && !selectedTicket && tabIndex !== -1 && !menuOpen
-      && !(activeTab === 'assets' && assetFormOpen) && !(activeTab === 'knowledge' && articleOpen),
+      && !(activeTab === 'assets' && assetFormOpen) && !(activeTab === 'knowledge' && articleOpen)
+      && !(activeTab === 'projects' && projectFormOpen),
     hasPrev: tabIndex > 0,
     hasNext: tabIndex !== -1 && tabIndex < TAB_ORDER.length - 1,
     onPrev: () => goToTab(TAB_ORDER[tabIndex - 1]),
@@ -218,6 +221,8 @@ export const App: React.FC = () => {
               <ProjectList
                 session={session}
                 onSelectProject={(prj) => setSelectedProject(prj)}
+                newProjectRequest={newProjectRequest}
+                onFormOpenChange={setProjectFormOpen}
               />
             )}
 
@@ -263,15 +268,19 @@ export const App: React.FC = () => {
         </ErrorBoundary>
       </main>
 
-      {/* Botón "+" flotante (estilo Google): nuevo ticket o nuevo activo según la sección */}
+      {/* Botón "+" flotante (estilo Google): nuevo proyecto, ticket o activo según la sección */}
       {session && !selectedTicket && !selectedProject && !menuOpen &&
-        (activeTab === 'tickets' || (activeTab === 'assets' && !assetFormOpen)) && (
+        ((activeTab === 'projects' && !projectFormOpen) || activeTab === 'tickets' || (activeTab === 'assets' && !assetFormOpen)) && (
         <button
           type="button"
           className="fab"
-          onClick={() => (activeTab === 'tickets' ? setActiveTab('create') : setNewAssetRequest(n => n + 1))}
-          aria-label={activeTab === 'tickets' ? 'Nuevo ticket' : 'Nuevo activo'}
-          title={activeTab === 'tickets' ? 'Nuevo ticket' : 'Nuevo activo'}
+          onClick={() => {
+            if (activeTab === 'projects') setNewProjectRequest(n => n + 1);
+            else if (activeTab === 'tickets') setActiveTab('create');
+            else setNewAssetRequest(n => n + 1);
+          }}
+          aria-label={activeTab === 'projects' ? 'Nuevo proyecto' : activeTab === 'tickets' ? 'Nuevo ticket' : 'Nuevo activo'}
+          title={activeTab === 'projects' ? 'Nuevo proyecto' : activeTab === 'tickets' ? 'Nuevo ticket' : 'Nuevo activo'}
         >
           <Plus size={28} strokeWidth={2.5} />
         </button>

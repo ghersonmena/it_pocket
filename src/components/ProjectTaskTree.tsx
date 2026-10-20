@@ -109,6 +109,8 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
   const [taskElements, setTaskElements] = useState<Record<number, LinkedElement>>({});
   const [projectElements, setProjectElements] = useState<LinkedElement[]>([]);
   const [viewingElements, setViewingElements] = useState<{ elements: LinkedElement[]; name: string } | null>(null);
+  // Fin previsto del proyecto: la tarea que termina más tarde (undefined = calculando)
+  const [planEnd, setPlanEnd] = useState<string | null | undefined>(undefined);
 
   const fetchTasks = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -123,6 +125,11 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
         console.log(`[ProjectTaskTree] Tareas raíz (sin padre): ${roots.length}`, roots.map(t => `#${t.id} "${t.name}" pid=${t.projecttasks_id} parent_name_ref="${t.parent_name_ref || ''}"`));
       }
       setFlatTasks(data);
+
+      // Fin previsto = término de la tarea más tardía (se guarda en GLPI si cambió)
+      GLPIService.syncProjectPlanEnd(session, project.id, data)
+        .then(setPlanEnd)
+        .catch(err => { console.warn('No se pudo actualizar el fin previsto del proyecto:', err); setPlanEnd(null); });
 
       // Los nombres de los participantes llegan después, sin retrasar el árbol
       setParticipantsLoaded(false);
@@ -758,6 +765,15 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
             <Pencil size={14} />
           </button>
         </h3>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+          <CalendarDays size={14} />
+          {planEnd === undefined
+            ? 'Fin previsto: calculando...'
+            : planEnd
+              ? <span>Fin previsto: <b style={{ color: 'var(--text-main)' }}>{new Date(planEnd.replace(' ', 'T')).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}</b> (tarea que termina más tarde)</span>
+              : 'Fin previsto: se calculará con las fechas de las tareas'}
+        </div>
 
         {projectElements.length > 0 && (
           <button

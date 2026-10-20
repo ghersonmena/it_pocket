@@ -84,6 +84,24 @@ export interface GLPIProject {
   tasks_count?: number;
 }
 
+// Cabecera de un proyecto nuevo (fechas en formato del input datetime-local: "YYYY-MM-DDTHH:MM")
+export interface ProjectHeaderForm {
+  name: string;
+  priority: number;
+  projectstates_id: number;
+  projecttypes_id: number;  // 0 = sin tipo
+  users_id: number;         // administrador del proyecto
+  plan_start_date: string;
+  real_start_date: string;
+  content: string;
+  members: number[];        // usuarios integrantes (equipo del proyecto)
+}
+
+export interface ProjectCatalogOption {
+  id: number;
+  label: string;
+}
+
 export interface GLPIProjectTask {
   id: number;
   projects_id: number;
