@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import type { GLPISession } from '../types/glpi';
 import { LogOut, X, ShieldCheck } from 'lucide-react';
+import { BrandLogo } from './BrandLogo';
 import { NAV_ITEMS } from '../navigation';
 import type { TabType } from '../navigation';
 
@@ -54,7 +55,7 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({ open, session, activeTab, 
         {/* Usuario */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', padding: '20px 16px 16px', borderBottom: '1px solid var(--border-color)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-            <div className="brand-logo" style={{ flexShrink: 0 }}>GL</div>
+            <div className="brand-logo"><BrandLogo size={40} /></div>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fullName}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)' }}>
@@ -85,7 +86,7 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({ open, session, activeTab, 
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 14px', marginBottom: '4px',
                   border: 'none', borderRadius: '14px', textAlign: 'left', cursor: 'pointer',
-                  background: active ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
+                  background: active ? 'rgba(245, 165, 36, 0.12)' : 'transparent',
                   color: active ? 'var(--primary)' : 'var(--text-main)', fontWeight: active ? 800 : 600, fontSize: '0.92rem'
                 }}
               >

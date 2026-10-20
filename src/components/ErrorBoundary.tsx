@@ -27,7 +27,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('[GLPI Mobile] Error en pantalla:', error, info.componentStack);
+    console.error('[ITPocket] Error en pantalla:', error, info.componentStack);
   }
 
   render() {

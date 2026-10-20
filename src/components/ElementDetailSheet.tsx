@@ -143,7 +143,7 @@ export const ElementDetailSheet: React.FC<ElementDetailSheetProps> = ({ session,
                     disabled={planStatus[`${detail.itemtype}#${detail.id}`] === 'Buscando croquis...'}
                     style={{
                       display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '12px',
-                      border: '1px solid rgba(59, 130, 246, 0.4)', background: 'rgba(59, 130, 246, 0.08)',
+                      border: '1px solid rgba(245, 165, 36, 0.4)', background: 'rgba(245, 165, 36, 0.08)',
                       color: 'var(--primary)', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer'
                     }}
                   >

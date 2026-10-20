@@ -21,7 +21,7 @@ const formatDate = (value: string) => {
 const chipStyle = (active: boolean): React.CSSProperties => ({
   flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 12px', borderRadius: '999px',
   border: `1.5px solid ${active ? 'var(--primary)' : 'var(--border-color)'}`,
-  background: active ? 'rgba(59, 130, 246, 0.12)' : 'var(--card-bg)',
+  background: active ? 'rgba(245, 165, 36, 0.12)' : 'var(--card-bg)',
   color: active ? 'var(--primary)' : 'var(--text-main)', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap'
 });
 

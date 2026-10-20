@@ -193,7 +193,7 @@ export const AssetFormView: React.FC<AssetFormViewProps> = ({
             style={{
               position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)',
               display: 'flex', padding: '7px', borderRadius: '10px', border: 'none',
-              background: 'rgba(59, 130, 246, 0.12)', color: 'var(--primary)', cursor: 'pointer'
+              background: 'rgba(245, 165, 36, 0.12)', color: 'var(--primary)', cursor: 'pointer'
             }}
           >
             <ScanLine size={18} />
@@ -246,7 +246,7 @@ export const AssetFormView: React.FC<AssetFormViewProps> = ({
         >
           <ArrowLeft size={18} /> {backLabel || config.label}
         </button>
-        {!isNew && <span className="badge" style={{ background: '#eff6ff', color: '#1d4ed8' }}>#{currentId}</span>}
+        {!isNew && <span className="badge" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}>#{currentId}</span>}
       </div>
 
       <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '14px' }}>
@@ -401,7 +401,7 @@ export const AssetFormView: React.FC<AssetFormViewProps> = ({
                   disabled={planLookup === 'Buscando croquis...'}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '12px',
-                    border: '1px solid rgba(59, 130, 246, 0.4)', background: 'rgba(59, 130, 246, 0.08)',
+                    border: '1px solid rgba(245, 165, 36, 0.4)', background: 'rgba(245, 165, 36, 0.08)',
                     color: 'var(--primary)', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer'
                   }}
                 >

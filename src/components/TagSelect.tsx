@@ -30,7 +30,7 @@ export const TagSelect: React.FC<TagSelectProps> = ({ options, value, onChange, 
   const chip: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 8px 6px 12px', borderRadius: '999px',
     fontSize: '0.8rem', fontWeight: 700, border: '1.5px solid var(--primary)',
-    background: 'rgba(59, 130, 246, 0.12)', color: 'var(--primary)'
+    background: 'rgba(245, 165, 36, 0.12)', color: 'var(--primary)'
   };
 
   return (
@@ -47,7 +47,7 @@ export const TagSelect: React.FC<TagSelectProps> = ({ options, value, onChange, 
               onClick={() => toggle(o.value)}
               disabled={disabled}
               aria-label={`Quitar ${o.label}`}
-              style={{ display: 'flex', padding: '2px', border: 'none', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.18)', color: 'var(--primary)', cursor: 'pointer' }}
+              style={{ display: 'flex', padding: '2px', border: 'none', borderRadius: '50%', background: 'rgba(245, 165, 36, 0.18)', color: 'var(--primary)', cursor: 'pointer' }}
             >
               <X size={12} />
             </button>

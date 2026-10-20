@@ -368,7 +368,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
             padding: '10px 12px',
             paddingLeft: '10px',
             background: isGroup
-              ? 'linear-gradient(90deg, rgba(59, 130, 246, 0.10), var(--card-bg) 60%)'
+              ? 'linear-gradient(90deg, rgba(245, 165, 36, 0.10), var(--card-bg) 60%)'
               : hasChildren ? 'var(--card-bg)' : 'var(--bg-main)',
             border: `1.5px solid ${isCompleted ? '#d1fae5' : 'var(--border-color)'}`,
             borderLeft: hasChildren ? `4px solid ${accentColor}` : `1.5px solid ${isCompleted ? '#d1fae5' : 'var(--border-color)'}`,
@@ -558,7 +558,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
                   padding: '6px 8px',
                   borderRadius: '10px',
                   border: '1px solid var(--border-color)',
-                  background: openPhotos[node.id] ? 'rgba(59, 130, 246, 0.08)' : 'var(--card-bg)',
+                  background: openPhotos[node.id] ? 'rgba(245, 165, 36, 0.08)' : 'var(--card-bg)',
                   color: openPhotos[node.id] ? 'var(--primary)' : 'var(--text-muted)',
                   fontWeight: 700,
                   fontSize: '0.75rem',
@@ -586,7 +586,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
                   padding: '6px 8px',
                   borderRadius: '10px',
                   border: '1px solid var(--border-color)',
-                  background: openNotes[node.id] ? 'rgba(59, 130, 246, 0.08)' : 'var(--card-bg)',
+                  background: openNotes[node.id] ? 'rgba(245, 165, 36, 0.08)' : 'var(--card-bg)',
                   color: openNotes[node.id] ? 'var(--primary)' : 'var(--text-muted)',
                   fontWeight: 700,
                   fontSize: '0.75rem',
@@ -602,8 +602,8 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
               <span
                 className="badge"
                 style={{
-                  background: isCompleted ? '#ecfdf5' : '#eff6ff',
-                  color: isCompleted ? '#059669' : '#2563eb',
+                  background: isCompleted ? '#ecfdf5' : 'var(--primary-soft)',
+                  color: isCompleted ? '#059669' : 'var(--primary)',
                   fontSize: '0.75rem',
                   fontWeight: 700
                 }}
@@ -622,7 +622,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
                   padding: '6px 10px',
                   borderRadius: '10px',
                   border: isCompleted ? '1px solid #a7f3d0' : '1px solid var(--primary)',
-                  background: isCompleted ? '#ecfdf5' : 'rgba(59, 130, 246, 0.08)',
+                  background: isCompleted ? '#ecfdf5' : 'rgba(245, 165, 36, 0.08)',
                   color: isCompleted ? '#059669' : 'var(--primary)',
                   fontWeight: 700,
                   fontSize: '0.75rem',
@@ -677,7 +677,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
               marginLeft: '10px',
               paddingLeft: '10px',
               // Línea guía del color del padre: deja claro qué filas pertenecen a qué grupo
-              borderLeft: `2px solid ${isGroup ? 'rgba(59, 130, 246, 0.35)' : isEquipment ? 'rgba(139, 92, 246, 0.35)' : 'var(--border-color)'}`
+              borderLeft: `2px solid ${isGroup ? 'rgba(245, 165, 36, 0.35)' : isEquipment ? 'rgba(139, 92, 246, 0.35)' : 'var(--border-color)'}`
             }}
           >
             {node.children.map(child => renderTreeNode(child))}
@@ -732,7 +732,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
       {/* Tarjeta Informativa del Proyecto */}
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <span className="badge" style={{ background: '#eff6ff', color: '#1d4ed8' }}>
+          <span className="badge" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}>
             Código: {project.code || `PRJ-${project.id}`}
           </span>
           <span 
@@ -796,7 +796,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
       {/* Notificación Toast Toast flotante */}
       {toastMsg && (
         <div className="alert-box alert-info animate-fade-in" style={{ boxShadow: 'var(--shadow-lg)' }}>
-          <Sparkles size={18} color="#2563eb" />
+          <Sparkles size={18} style={{ color: 'var(--primary)' }} />
           <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>{toastMsg}</div>
         </div>
       )}

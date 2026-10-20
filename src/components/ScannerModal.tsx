@@ -405,7 +405,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({ fieldLabel, kind, on
               type="button"
               onClick={() => photoInputRef.current?.click()}
               disabled={!!busy}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 18px', borderRadius: '14px', border: 'none', background: 'var(--primary-gradient)', color: '#fff', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 18px', borderRadius: '14px', border: 'none', background: 'var(--primary-gradient)', color: 'var(--on-primary)', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer' }}
             >
               <Camera size={18} /> Tomar foto de la etiqueta
             </button>
@@ -482,7 +482,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({ fieldLabel, kind, on
             type="button"
             onClick={readTextFromCamera}
             disabled={!cameraReady || !!busy}
-            style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '13px', borderRadius: '14px', border: 'none', background: 'var(--primary-gradient)', color: '#fff', fontWeight: 800, fontSize: '0.95rem', cursor: !cameraReady || busy ? 'not-allowed' : 'pointer', opacity: !cameraReady || busy ? 0.6 : 1 }}
+            style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '13px', borderRadius: '14px', border: 'none', background: 'var(--primary-gradient)', color: 'var(--on-primary)', fontWeight: 800, fontSize: '0.95rem', cursor: !cameraReady || busy ? 'not-allowed' : 'pointer', opacity: !cameraReady || busy ? 0.6 : 1 }}
           >
             <ScanText size={18} /> Leer
           </button>

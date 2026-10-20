@@ -107,7 +107,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ session, onSelectProje
                 style={{ padding: '18px', marginBottom: '14px' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span className="badge" style={{ background: '#eff6ff', color: '#1d4ed8', fontSize: '0.72rem' }}>
+                  <span className="badge" style={{ background: 'var(--primary-soft)', color: 'var(--primary)', fontSize: '0.72rem' }}>
                     {prj.code || `PRJ-${prj.id}`}
                   </span>
                   <span 

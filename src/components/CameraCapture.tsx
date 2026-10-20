@@ -163,7 +163,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onDone, onUseNativ
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 16px',
                 borderRadius: '12px', border: 'none', background: 'var(--primary-gradient)',
-                color: '#fff', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer'
+                color: 'var(--on-primary)', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer'
               }}
             >
               <Camera size={16} /> Usar la cámara del teléfono

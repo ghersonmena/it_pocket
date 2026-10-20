@@ -1,6 +1,7 @@
 import React from 'react';
 import type { GLPISession } from '../types/glpi';
 import { ShieldCheck, Sparkles, Menu } from 'lucide-react';
+import { BrandLogo, BrandWordmark } from './BrandLogo';
 
 interface HeaderProps {
   session: GLPISession | null;
@@ -12,7 +13,7 @@ export const Header: React.FC<HeaderProps> = ({ session, title, onMenu }) => {
   return (
     <header className="app-header">
       <div className="brand-badge">
-        {session && onMenu ? (
+        {session && onMenu && (
           <button
             type="button"
             onClick={onMenu}
@@ -20,18 +21,15 @@ export const Header: React.FC<HeaderProps> = ({ session, title, onMenu }) => {
             title="Menú"
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px',
-              border: 'none', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)', cursor: 'pointer'
+              border: 'none', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.08)', color: 'var(--brand-amber)', cursor: 'pointer'
             }}
           >
             <Menu size={22} />
           </button>
-        ) : (
-          <div className="brand-logo">
-            GL
-          </div>
         )}
+        <div className="brand-logo"><BrandLogo size={36} /></div>
         <div>
-          <div className="brand-title">{title || 'GLPI Mobile'}</div>
+          <div className="brand-title">{title || <BrandWordmark />}</div>
           {session && (
             <div className="brand-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <ShieldCheck size={12} color="#10b981" />

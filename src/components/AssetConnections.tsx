@@ -204,7 +204,7 @@ const ConnectPicker: React.FC<PickerProps> = ({ session, title, types, excludeCo
                     style={{
                       flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 11px', borderRadius: '999px',
                       border: `1.5px solid ${t === type ? 'var(--primary)' : 'var(--border-color)'}`,
-                      background: t === type ? 'rgba(59, 130, 246, 0.12)' : 'var(--card-bg)',
+                      background: t === type ? 'rgba(245, 165, 36, 0.12)' : 'var(--card-bg)',
                       color: t === type ? 'var(--primary)' : 'var(--text-main)', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer'
                     }}
                   >

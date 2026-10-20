@@ -79,7 +79,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ session, onNavigateTab }) 
       </div>
 
       {/* Información del Perfil Conectado */}
-      <div className="card" style={{ background: 'var(--primary-gradient)', color: 'white' }}>
+      <div className="card" style={{ background: 'var(--primary-gradient)', color: 'var(--on-primary)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <ShieldCheck size={24} />

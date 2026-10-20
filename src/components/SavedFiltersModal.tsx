@@ -45,7 +45,7 @@ export const SavedFiltersModal: React.FC<SavedFiltersModalProps> = ({
         style={{
           width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 10px',
           border: 'none', borderBottom: '1px solid var(--border-color)', textAlign: 'left', cursor: 'pointer',
-          background: selected ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+          background: selected ? 'rgba(245, 165, 36, 0.1)' : 'transparent',
           borderLeft: `3px solid ${selected ? 'var(--primary)' : 'transparent'}`
         }}
       >

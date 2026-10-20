@@ -163,7 +163,7 @@ export const AssignParticipants: React.FC<AssignParticipantsProps> = ({
                     padding: '10px 8px',
                     border: 'none',
                     borderRadius: 'var(--radius-sm)',
-                    background: assigned ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
+                    background: assigned ? 'rgba(245, 165, 36, 0.08)' : 'transparent',
                     textAlign: 'left',
                     cursor: savingUserId !== null ? 'wait' : 'pointer'
                   }}
@@ -202,7 +202,7 @@ export const AssignParticipants: React.FC<AssignParticipantsProps> = ({
             onClick={onClose}
             style={{
               width: '100%', padding: '10px', borderRadius: '10px', border: 'none',
-              background: 'var(--primary-gradient)', color: '#fff', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer'
+              background: 'var(--primary-gradient)', color: 'var(--on-primary)', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer'
             }}
           >
             Listo

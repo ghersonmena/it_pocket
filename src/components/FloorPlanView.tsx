@@ -562,14 +562,14 @@ export const FloorPlanView: React.FC<FloorPlanViewProps> = ({ session, locationI
                       {showLabel && (
                         <span style={{
                           marginBottom: '2px', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap',
-                          background: isSelected ? '#2563eb' : 'rgba(15, 23, 42, 0.8)', color: '#fff', fontSize: '11px', fontWeight: 700
+                          background: isSelected ? '#b45309' : 'rgba(15, 23, 42, 0.8)', color: '#fff', fontSize: '11px', fontWeight: 700
                         }}>
                           {shortName(node) || `#${m.l}`}
                         </span>
                       )}
                       <span style={{ position: 'relative', display: 'flex' }}>
                         {isSelected && mode === 'view' && <span className="pin-pulse" />}
-                        <MapPin size={isSelected ? 32 : 24} color="#fff" fill={isSelected ? '#2563eb' : '#ef4444'} strokeWidth={1.5} />
+                        <MapPin size={isSelected ? 32 : 24} color="#fff" fill={isSelected ? '#f59e0b' : '#ef4444'} strokeWidth={1.5} />
                       </span>
                     </div>
                   );
@@ -605,7 +605,7 @@ export const FloorPlanView: React.FC<FloorPlanViewProps> = ({ session, locationI
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                 <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <MapPin size={16} color="#2563eb" /> {selectedNode.name}
+                  <MapPin size={16} color="#d97706" /> {selectedNode.name}
                 </div>
                 {mode === 'edit' ? (
                   <button type="button" onClick={() => { setMarkers(ms => ms.filter(m => m.l !== selected)); setSelected(null); }}

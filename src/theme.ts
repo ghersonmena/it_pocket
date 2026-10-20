@@ -5,8 +5,8 @@
 export type ThemePreference = 'system' | 'light' | 'dark';
 
 const STORAGE_KEY = 'glpi_theme';
-// Color de la barra del navegador / barra de estado en Android (igual a --bg-main)
-const THEME_COLORS = { light: '#f8fafc', dark: '#0b0f17' };
+// Color de la barra del navegador / barra de estado en Android (igual a --header-bg)
+const THEME_COLORS = { light: '#1c1f26', dark: '#16181d' };
 
 const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 

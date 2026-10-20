@@ -257,7 +257,7 @@ export const AssetsScreen: React.FC<AssetsScreenProps> = ({ session, onFormOpenC
               style={{
                 flex: '0 0 auto', padding: '7px 12px', borderRadius: '999px',
                 border: `1.5px solid ${active ? 'var(--primary)' : 'var(--border-color)'}`,
-                background: active ? 'rgba(59, 130, 246, 0.12)' : 'var(--card-bg)',
+                background: active ? 'rgba(245, 165, 36, 0.12)' : 'var(--card-bg)',
                 color: active ? 'var(--primary)' : 'var(--text-main)',
                 fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap'
               }}
@@ -289,7 +289,7 @@ export const AssetsScreen: React.FC<AssetsScreenProps> = ({ session, onFormOpenC
             style={{
               position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)',
               display: 'flex', padding: '7px', borderRadius: '10px', border: 'none',
-              background: 'rgba(59, 130, 246, 0.12)', color: 'var(--primary)', cursor: 'pointer'
+              background: 'rgba(245, 165, 36, 0.12)', color: 'var(--primary)', cursor: 'pointer'
             }}
           >
             <ScanLine size={18} />
@@ -315,7 +315,7 @@ export const AssetsScreen: React.FC<AssetsScreenProps> = ({ session, onFormOpenC
           style={{
             position: 'relative', padding: '0 12px', borderRadius: 'var(--radius-md)',
             border: `1px solid ${activeFilter ? 'var(--primary)' : 'var(--border-color)'}`,
-            background: activeFilter ? 'rgba(59, 130, 246, 0.12)' : 'var(--card-bg)',
+            background: activeFilter ? 'rgba(245, 165, 36, 0.12)' : 'var(--card-bg)',
             color: activeFilter ? 'var(--primary)' : 'var(--text-main)', cursor: 'pointer'
           }}
         >
@@ -328,7 +328,7 @@ export const AssetsScreen: React.FC<AssetsScreenProps> = ({ session, onFormOpenC
         <div
           style={{
             display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px', padding: '7px 8px 7px 12px',
-            borderRadius: '999px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.35)',
+            borderRadius: '999px', background: 'rgba(245, 165, 36, 0.1)', border: '1px solid rgba(245, 165, 36, 0.35)',
             color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 700
           }}
         >
@@ -341,7 +341,7 @@ export const AssetsScreen: React.FC<AssetsScreenProps> = ({ session, onFormOpenC
             type="button"
             onClick={() => applyFilter(null)}
             aria-label="Quitar filtro"
-            style={{ display: 'flex', padding: '3px', border: 'none', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.15)', color: 'var(--primary)', cursor: 'pointer' }}
+            style={{ display: 'flex', padding: '3px', border: 'none', borderRadius: '50%', background: 'rgba(245, 165, 36, 0.15)', color: 'var(--primary)', cursor: 'pointer' }}
           >
             <X size={13} />
           </button>

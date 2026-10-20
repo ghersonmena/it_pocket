@@ -1,32 +1,46 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;700&display=swap');
 
 :root {
-  --primary: #3b82f6;
-  --primary-hover: #2563eb;
-  --primary-gradient: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
-  --bg-main: #f8fafc;
+  /* Marca ITPocket: grafito + ámbar. --primary es el ámbar para texto, íconos y bordes (más
+     oscuro en modo claro para que se lea sobre blanco); los rellenos ámbar llevan texto
+     --on-primary (grafito), porque blanco sobre ámbar no se lee. */
+  --brand-graphite: #1c1f26;
+  --brand-amber: #f5a524;
+  --primary: #b45309;
+  --primary-hover: #92400e;
+  --primary-gradient: linear-gradient(135deg, #f5a524 0%, #f59e0b 100%);
+  --primary-soft: rgba(245, 165, 36, 0.14);
+  --on-primary: #1c1f26;
+  --header-bg: #1c1f26;
+  --header-text: #ffffff;
+  --header-muted: #a9afbc;
+  --bg-main: #f7f7f5;
   --card-bg: #ffffff;
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-  --border-color: #e2e8f0;
+  --text-main: #1c1f26;
+  --text-muted: #5f6573;
+  --border-color: #e4e4e0;
   --glass-bg: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(226, 232, 240, 0.8);
+  --glass-border: rgba(228, 228, 224, 0.8);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 20px -2px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 12px 32px -4px rgba(15, 23, 42, 0.12);
+  --shadow-md: 0 4px 20px -2px rgba(28, 31, 38, 0.08);
+  --shadow-lg: 0 12px 32px -4px rgba(28, 31, 38, 0.12);
   --radius-lg: 18px;
   --radius-md: 12px;
   --radius-sm: 8px;
 }
 
 [data-theme='dark'] {
-  --bg-main: #0b0f17;
-  --card-bg: #151c2c;
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --border-color: #26334d;
-  --glass-bg: rgba(21, 28, 44, 0.85);
-  --glass-border: rgba(38, 51, 77, 0.8);
+  --primary: #f5a524;
+  --primary-hover: #fbbf24;
+  --primary-soft: rgba(245, 165, 36, 0.16);
+  --header-bg: #16181d;
+  --bg-main: #0f1115;
+  --card-bg: #1c1f26;
+  --text-main: #f4f4f2;
+  --text-muted: #a9afbc;
+  --border-color: #2e333d;
+  --glass-bg: rgba(28, 31, 38, 0.85);
+  --glass-border: rgba(46, 51, 61, 0.8);
   --shadow-md: 0 4px 24px -2px rgba(0, 0, 0, 0.4);
 }
 
@@ -47,7 +61,7 @@ html, body {
 }
 
 body {
-  background-color: #0f172a;
+  background-color: #16181d;
   color: var(--text-main);
   display: flex;
   justify-content: center;
@@ -84,14 +98,14 @@ body {
 @media (min-width: 640px) {
   body {
     padding: 24px 0;
-    background: radial-gradient(circle at 50% 20%, #1e293b 0%, #0f172a 100%);
+    background: radial-gradient(circle at 50% 20%, #2a2f3a 0%, #16181d 100%);
   }
   .mobile-app-wrapper {
     border-radius: 36px;
     height: 90vh;
     height: 90dvh;
     max-height: 920px;
-    border: 8px solid #1e293b;
+    border: 8px solid #2a2f3a;
   }
 }
 
@@ -100,10 +114,8 @@ body {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: var(--glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--glass-border);
+  background: var(--header-bg);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   padding: 16px 20px;
   /* Abierta como app (pantalla completa) la barra de estado / notch queda encima */
   padding-top: calc(16px + env(safe-area-inset-top, 0px));
@@ -119,16 +131,8 @@ body {
 }
 
 .brand-logo {
-  width: 36px;
-  height: 36px;
-  background: var(--primary-gradient);
-  border-radius: 10px;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 800;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  flex-shrink: 0;
 }
 
 .brand-title {
@@ -137,6 +141,13 @@ body {
   letter-spacing: -0.3px;
   color: var(--text-main);
 }
+
+/* Nombre de la app: "IT" en ámbar + "Pocket" */
+.brand-wordmark { font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif; letter-spacing: -0.4px; }
+.brand-wordmark b { font-weight: 700; color: var(--brand-amber); }
+.brand-wordmark span { font-weight: 400; }
+.app-header .brand-title { color: var(--header-text); }
+.app-header .brand-subtitle { color: var(--header-muted); }
 
 .brand-subtitle {
   font-size: 0.72rem;
@@ -230,7 +241,7 @@ body {
 
 .form-input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 4px rgba(245, 165, 36, 0.25);
   background-color: var(--card-bg);
 }
 
@@ -238,7 +249,7 @@ body {
   width: 100%;
   padding: 15px;
   background: var(--primary-gradient);
-  color: white;
+  color: var(--on-primary);
   border: none;
   border-radius: var(--radius-md);
   font-size: 0.95rem;
@@ -248,13 +259,13 @@ body {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  box-shadow: 0 8px 20px -4px rgba(37, 99, 235, 0.4);
+  box-shadow: 0 8px 20px -4px rgba(217, 119, 6, 0.4);
   transition: all 0.2s ease;
 }
 
 .btn-primary:active {
   transform: scale(0.98);
-  box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 4px 12px -2px rgba(217, 119, 6, 0.3);
 }
 
 .btn-secondary {
@@ -400,7 +411,7 @@ body {
 }
 .pin-pulse {
   position: absolute; left: 50%; top: 40%; width: 34px; height: 34px; border-radius: 50%;
-  background: rgba(37, 99, 235, 0.45); animation: pinPulse 1.4s ease-out infinite; pointer-events: none;
+  background: rgba(217, 119, 6, 0.45); animation: pinPulse 1.4s ease-out infinite; pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) { .pin-pulse { animation: none; opacity: 0.4; } }
 
@@ -417,9 +428,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--on-primary);
   background: var(--primary-gradient);
-  box-shadow: 0 10px 24px -6px rgba(37, 99, 235, 0.55), 0 4px 10px rgba(15, 23, 42, 0.2);
+  box-shadow: 0 10px 24px -6px rgba(217, 119, 6, 0.55), 0 4px 10px rgba(28, 31, 38, 0.2);
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
   animation: fabIn 0.2s ease-out;

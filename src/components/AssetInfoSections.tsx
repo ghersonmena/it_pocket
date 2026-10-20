@@ -162,7 +162,7 @@ export const AssetNetworkSection: React.FC<SectionProps> = ({ session, itemtype,
   return (
     <>
       {mainIps.length > 0 && (
-        <div className="card" style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+        <div className="card" style={{ background: 'rgba(245, 165, 36, 0.08)', border: '1px solid rgba(245, 165, 36, 0.3)' }}>
           <CardTitle icon={<Network size={16} />} title={mainIps.length === 1 ? 'IP principal' : 'IPs principales'} />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {[...new Set(mainIps)].map(ip => (
@@ -173,7 +173,7 @@ export const AssetNetworkSection: React.FC<SectionProps> = ({ session, itemtype,
                 title="Copiar IP"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '10px',
-                  border: '1px solid rgba(59, 130, 246, 0.4)', background: 'var(--card-bg)', color: 'var(--primary)',
+                  border: '1px solid rgba(245, 165, 36, 0.4)', background: 'var(--card-bg)', color: 'var(--primary)',
                   fontFamily: 'monospace', fontSize: '0.95rem', fontWeight: 800, cursor: 'pointer'
                 }}
               >

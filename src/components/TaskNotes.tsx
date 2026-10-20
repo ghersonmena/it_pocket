@@ -115,7 +115,7 @@ export const TaskNotes: React.FC<TaskNotesProps> = ({ session, taskId, indent, o
             borderRadius: '10px',
             border: 'none',
             background: 'var(--primary-gradient)',
-            color: '#fff',
+            color: 'var(--on-primary)',
             fontWeight: 700,
             fontSize: '0.75rem',
             cursor: saving || !draft.trim() ? 'not-allowed' : 'pointer',

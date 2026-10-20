@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { GLPIAuthConfig, GLPISession } from '../types/glpi';
 import { GLPIService } from '../services/glpiService';
 import { User, Lock, Key, Server, Eye, EyeOff, Loader2, AlertCircle, Sparkles, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { BrandLogo } from './BrandLogo';
 
 interface LoginProps {
   onLoginSuccess: (session: GLPISession) => void;
@@ -96,26 +97,11 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   return (
     <div className="animate-fade-in" style={{ padding: '8px 0' }}>
       <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-        <div 
-          style={{
-            width: '64px',
-            height: '64px',
-            background: 'var(--primary-gradient)',
-            borderRadius: '20px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 800,
-            fontSize: '1.8rem',
-            marginBottom: '12px',
-            boxShadow: '0 8px 24px rgba(37, 99, 235, 0.35)'
-          }}
-        >
-          GL
+        <div style={{ display: 'inline-flex', marginBottom: '12px', filter: 'drop-shadow(0 8px 18px rgba(28, 31, 38, 0.3))' }}>
+          <BrandLogo size={96} title="ITPocket" />
         </div>
         <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-main)' }}>
-          Acceso a GLPI API
+          Acceso a <span className="brand-wordmark"><b style={{ color: 'var(--primary)' }}>IT</b><span>Pocket</span></span>
         </h2>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
           Conéctate a tu mesa de ayuda empresarial

@@ -134,7 +134,7 @@ export const SearchSelect: React.FC<SearchSelectProps> = ({ label, value, option
                       style={{
                         width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 10px',
                         border: 'none', borderRadius: '12px', textAlign: 'left', cursor: 'pointer',
-                        background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent'
+                        background: isSelected ? 'rgba(245, 165, 36, 0.1)' : 'transparent'
                       }}
                     >
                       <span style={{ flex: 1, minWidth: 0, fontSize: '0.84rem' }}>
