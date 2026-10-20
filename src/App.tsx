@@ -18,6 +18,10 @@ import { ProjectTaskTree } from './components/ProjectTaskTree';
 import { AssetsScreen } from './components/AssetsScreen';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useSwipeNavigation } from './hooks/useSwipeNavigation';
+import { useTaskReminders } from './hooks/useTaskReminders';
+import { NotificationBanners } from './components/NotificationBanners';
+import { NotificationsScreen } from './components/NotificationsScreen';
+import type { TaskReminder } from './services/notificationService';
 import type { SlideDirection } from './hooks/useSwipeNavigation';
 
 // Orden de los módulos en la barra inferior; deslizar avanza o retrocede en este orden
@@ -82,6 +86,8 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('projects');
   const [selectedTicket, setSelectedTicket] = useState<GLPITicket | null>(null);
   const [selectedProject, setSelectedProject] = useState<GLPIProject | null>(null);
+  // Tarea que se abre al entrar al proyecto (desde un aviso o el historial de notificaciones)
+  const [focusTaskId, setFocusTaskId] = useState<number | null>(null);
   // Dirección de la animación al cambiar de módulo y si Activos tiene abierto un formulario
   const [slideDirection, setSlideDirection] = useState<SlideDirection>(null);
   // Hay un detalle abierto dentro de Activos o Conocimiento (formulario, artículo): no se cambia
@@ -181,6 +187,17 @@ export const App: React.FC = () => {
     setSelectedProject(null);
   };
 
+  const reminders = useTaskReminders(session);
+
+  // Abrir la tarea de un aviso: su proyecto y, dentro, el detalle de la tarea
+  const openReminder = (target: TaskReminder, notificationId?: string) => {
+    if (notificationId) reminders.markRead(notificationId);
+    setMenuOpen(false);
+    setSelectedTicket(null);
+    setSelectedProject({ id: target.projectId, name: target.projectName, percent_done: 0, date: '', date_mod: '' });
+    setFocusTaskId(target.taskId);
+  };
+
   const getHeaderTitle = (): string | undefined => {
     if (selectedProject) return `Proyecto #${selectedProject.id}`;
     if (selectedTicket) return `Ticket #${selectedTicket.id}`;
@@ -193,7 +210,17 @@ export const App: React.FC = () => {
         session={session}
         title={getHeaderTitle()}
         onMenu={() => setMenuOpen(true)}
+        unreadNotifications={reminders.unread}
+        onNotifications={() => { setSelectedTicket(null); setSelectedProject(null); goToTab('notifications'); }}
       />
+
+      {session && (
+        <NotificationBanners
+          banners={reminders.banners}
+          onOpen={n => { reminders.dismissBanner(n.id); openReminder(n, n.id); }}
+          onDismiss={reminders.dismissBanner}
+        />
+      )}
 
       <main className="app-content" {...swipe.handlers}>
         <ErrorBoundary resetKey={`${activeTab}-${selectedProject?.id ?? ''}-${selectedTicket?.id ?? ''}`}>
@@ -201,9 +228,13 @@ export const App: React.FC = () => {
           <Login onLoginSuccess={handleLoginSuccess} />
         ) : selectedProject ? (
           <ProjectTaskTree
+            key={selectedProject.id}
             session={session}
             project={selectedProject}
             onBack={() => setSelectedProject(null)}
+            focusTaskId={focusTaskId}
+            onFocusHandled={() => setFocusTaskId(null)}
+            onTasksChanged={reminders.refresh}
           />
         ) : selectedTicket ? (
           <TicketDetail
@@ -250,6 +281,16 @@ export const App: React.FC = () => {
               <KnowledgeScreen session={session} onArticleOpenChange={setArticleOpen} />
             )}
 
+            {activeTab === 'notifications' && (
+              <NotificationsScreen
+                history={reminders.history}
+                upcoming={reminders.upcoming}
+                onOpen={openReminder}
+                onMarkAllRead={reminders.markAllRead}
+                onClear={reminders.clearHistory}
+              />
+            )}
+
             {activeTab === 'dashboard' && (
               <Dashboard
                 session={session}
@@ -293,6 +334,7 @@ export const App: React.FC = () => {
           activeTab={activeTab}
           onClose={() => setMenuOpen(false)}
           onLogout={() => { setMenuOpen(false); handleLogout(); }}
+          badges={{ notifications: reminders.unread }}
           onSelect={(tab) => {
             setMenuOpen(false);
             setSelectedTicket(null);

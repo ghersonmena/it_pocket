@@ -12,10 +12,11 @@ interface NavDrawerProps {
   onSelect: (tab: TabType) => void;
   onClose: () => void;
   onLogout: () => void;
+  badges?: Partial<Record<TabType, number>>; // número de pendientes junto a una sección
 }
 
 // Menú lateral izquierdo (se abre con ☰): todas las secciones de la app con sus íconos
-export const NavDrawer: React.FC<NavDrawerProps> = ({ open, session, activeTab, onSelect, onClose, onLogout }) => {
+export const NavDrawer: React.FC<NavDrawerProps> = ({ open, session, activeTab, onSelect, onClose, onLogout, badges }) => {
   // Cerrar con Escape (teclado / escritorio)
   useEffect(() => {
     if (!open) return;
@@ -91,7 +92,12 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({ open, session, activeTab, 
                 }}
               >
                 <span style={{ display: 'flex', color: active ? 'var(--primary)' : 'var(--text-muted)' }}>{item.icon}</span>
-                {item.label}
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {!!badges?.[item.tab] && (
+                  <span style={{ minWidth: '22px', padding: '2px 7px', borderRadius: '999px', background: 'var(--brand-amber)', color: 'var(--brand-graphite)', fontSize: '0.72rem', fontWeight: 800, textAlign: 'center' }}>
+                    {badges[item.tab]! > 99 ? '99+' : badges[item.tab]}
+                  </span>
+                )}
               </button>
             );
           })}

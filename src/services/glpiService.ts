@@ -727,7 +727,21 @@ export class GLPIService {
     if (session.isMock) {
       return [...(MOCK_PROJECT_TASKS[projectId] || MOCK_PROJECT_TASKS[1] || [])];
     }
+    return this.tasksOfProject(await this.loadAllProjectTasks(session), projectId);
+  }
 
+  /** Tareas de todos los proyectos, agrupadas por proyecto, con una sola carga de tareas. */
+  static async getAllProjectTasks(session: GLPISession): Promise<Map<number, GLPIProjectTask[]>> {
+    if (session.isMock) {
+      return new Map(Object.entries(MOCK_PROJECT_TASKS).map(([id, tasks]) => [Number(id), [...tasks]]));
+    }
+    const globalMap = await this.loadAllProjectTasks(session);
+    const projectIds = new Set([...globalMap.values()].map(t => t.projects_id).filter(id => id > 0));
+    return new Map([...projectIds].map(id => [id, this.tasksOfProject(globalMap, id)]));
+  }
+
+  /** TODAS las tareas de proyecto del sistema (GLPI filtra los listados; ver PASO 1). */
+  private static async loadAllProjectTasks(session: GLPISession): Promise<Map<number, GLPIProjectTask>> {
     const globalMap = new Map<number, GLPIProjectTask>(); // TODAS las tareas del sistema
 
     try {
@@ -748,53 +762,56 @@ export class GLPIService {
 
       console.log(`[GLPI] Tareas visibles en listado: ${listed.length}, recuperadas por ID: ${scanned.length}`);
       console.log(`[GLPI] Total tareas en sistema: ${globalMap.size}`);
-
-      // ═══ PASO 2: Construir índice de hijos por parentId ═══
-      const childrenIndex = new Map<number, number[]>(); // parentId → [childId, ...]
-      globalMap.forEach((task) => {
-        const pid = task.projecttasks_id || 0;
-        if (!childrenIndex.has(pid)) childrenIndex.set(pid, []);
-        childrenIndex.get(pid)!.push(task.id);
-      });
-
-      // ═══ PASO 3: Identificar raíces del proyecto ═══
-      // En GLPI, las tareas raíz tienen projects_id === projectId y projecttasks_id === 0
-      // (o cualquier valor que no existe en el mapa = orphan)
-      const projectRootIds: number[] = [];
-      globalMap.forEach((task) => {
-        if (task.projects_id === projectId) {
-          // Verificar si su padre también pertenece al proyecto
-          const parentInProject = task.projecttasks_id > 0 && globalMap.get(task.projecttasks_id)?.projects_id === projectId;
-          if (!parentInProject) {
-            projectRootIds.push(task.id);
-          }
-        }
-      });
-
-      console.log(`[GLPI] Raíces del proyecto ${projectId}: ${projectRootIds.length}`, projectRootIds);
-
-      // ═══ PASO 4: Recolectar recursivamente todos los descendientes ═══
-      const result = new Map<number, GLPIProjectTask>();
-
-      const collectDescendants = (taskId: number) => {
-        const task = globalMap.get(taskId);
-        if (!task || result.has(taskId)) return;
-        result.set(taskId, task);
-        // Recolectar hijos (aunque tengan projects_id=0, son parte del árbol)
-        const children = childrenIndex.get(taskId) || [];
-        children.forEach(childId => collectDescendants(childId));
-      };
-
-      projectRootIds.forEach(rootId => collectDescendants(rootId));
-
-      const tasksList = Array.from(result.values());
-      console.log(`[GLPI] Tareas del proyecto ${projectId}: ${tasksList.length} (de ${globalMap.size} totales en el sistema)`);
-      return tasksList;
-
+      return globalMap;
     } catch (err: any) {
       console.error('Error cargando tareas de GLPI:', err);
       throw new Error(`Error al conectar con la API de GLPI: ${err.message || err}`);
     }
+  }
+
+  /** Tareas de un proyecto: sus raíces y todos sus descendientes. */
+  private static tasksOfProject(globalMap: Map<number, GLPIProjectTask>, projectId: number): GLPIProjectTask[] {
+    // ═══ PASO 2: Construir índice de hijos por parentId ═══
+    const childrenIndex = new Map<number, number[]>(); // parentId → [childId, ...]
+    globalMap.forEach((task) => {
+      const pid = task.projecttasks_id || 0;
+      if (!childrenIndex.has(pid)) childrenIndex.set(pid, []);
+      childrenIndex.get(pid)!.push(task.id);
+    });
+
+    // ═══ PASO 3: Identificar raíces del proyecto ═══
+    // En GLPI, las tareas raíz tienen projects_id === projectId y projecttasks_id === 0
+    // (o cualquier valor que no existe en el mapa = orphan)
+    const projectRootIds: number[] = [];
+    globalMap.forEach((task) => {
+      if (task.projects_id === projectId) {
+        // Verificar si su padre también pertenece al proyecto
+        const parentInProject = task.projecttasks_id > 0 && globalMap.get(task.projecttasks_id)?.projects_id === projectId;
+        if (!parentInProject) {
+          projectRootIds.push(task.id);
+        }
+      }
+    });
+
+    console.log(`[GLPI] Raíces del proyecto ${projectId}: ${projectRootIds.length}`, projectRootIds);
+
+    // ═══ PASO 4: Recolectar recursivamente todos los descendientes ═══
+    const result = new Map<number, GLPIProjectTask>();
+
+    const collectDescendants = (taskId: number) => {
+      const task = globalMap.get(taskId);
+      if (!task || result.has(taskId)) return;
+      result.set(taskId, task);
+      // Recolectar hijos (aunque tengan projects_id=0, son parte del árbol)
+      const children = childrenIndex.get(taskId) || [];
+      children.forEach(childId => collectDescendants(childId));
+    };
+
+    projectRootIds.forEach(rootId => collectDescendants(rootId));
+
+    const tasksList = Array.from(result.values());
+    console.log(`[GLPI] Tareas del proyecto ${projectId}: ${tasksList.length} (de ${globalMap.size} totales en el sistema)`);
+    return tasksList;
   }
 
 

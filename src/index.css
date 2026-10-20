@@ -459,3 +459,11 @@ body {
 .kb-content code { padding: 1px 5px; }
 .kb-content pre { padding: 10px; overflow-x: auto; }
 .kb-content blockquote { border-left: 3px solid var(--primary); margin: 0 0 10px; padding: 4px 12px; color: var(--text-muted); }
+
+/* Aviso emergente de tarea por comenzar: entra deslizándose desde arriba */
+.notification-banner { animation: bannerIn 0.28s ease-out; }
+@keyframes bannerIn {
+  from { transform: translateY(-24px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .notification-banner { animation: none; } }

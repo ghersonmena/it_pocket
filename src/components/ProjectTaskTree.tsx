@@ -96,9 +96,12 @@ interface ProjectTaskTreeProps {
   session: GLPISession;
   project: GLPIProject;
   onBack: () => void;
+  focusTaskId?: number | null;    // tarea cuyo detalle se abre al cargar (desde un aviso)
+  onFocusHandled?: () => void;
+  onTasksChanged?: () => void;    // para actualizar los recordatorios de tareas
 }
 
-export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, project, onBack }) => {
+export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, project, onBack, focusTaskId, onFocusHandled, onTasksChanged }) => {
   const [flatTasks, setFlatTasks] = useState<GLPIProjectTask[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -210,6 +213,25 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
   useEffect(() => {
     fetchTasks();
   }, [project.id]);
+
+  // Abrir el detalle de la tarea de un aviso (con sus grupos abiertos en el árbol)
+  useEffect(() => {
+    if (!focusTaskId || loading) return;
+    const task = flatTasks.find(t => t.id === focusTaskId);
+    if (task) {
+      const open: Record<number, boolean> = {};
+      let parentId = task.projecttasks_id;
+      for (let guard = 0; parentId && guard < 50; guard++) {
+        open[parentId] = true;
+        parentId = flatTasks.find(t => t.id === parentId)?.projecttasks_id || 0;
+      }
+      setExpandedNodes(prev => ({ ...prev, ...open }));
+      setViewStack([{ kind: 'task', id: focusTaskId }]);
+    } else {
+      showToast('La tarea del aviso ya no está en este proyecto.');
+    }
+    onFocusHandled?.();
+  }, [focusTaskId, loading, flatTasks]);
 
   // Construir el árbol de jerarquía (WBS) dinámicamente a partir de la lista plana
   const buildTree = (tasks: GLPIProjectTask[]): ProjectTaskNode[] => {
@@ -372,6 +394,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
         : t));
       setFlatTasks(next);
       await runSync(next);
+      onTasksChanged?.();
 
       setToastMsg(`¡Hito "${node.name}" marcado al 100% y cerrado en GLPI!`);
       setTimeout(() => setToastMsg(null), 3500);
@@ -755,6 +778,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
           showToast(parentId ? 'Subtarea creada en GLPI.' : 'Tarea creada en GLPI.');
           // Si el proyecto estaba cerrado, las tareas nuevas lo reabren
           await fetchTasks(true, { reopenIfPending: true });
+          onTasksChanged?.();
         }}
       />
     )}
@@ -780,7 +804,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
           onComplete={node => handleToggleComplete(node)}
           onAssign={node => setAssigningNode(node)}
           onViewElement={node => setViewingElements({ elements: [taskElements[node.id]], name: node.name })}
-          onSaved={() => fetchTasks(true)}
+          onSaved={async () => { await fetchTasks(true); onTasksChanged?.(); }}
         />
       </>
     ) : (
