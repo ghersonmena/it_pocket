@@ -1,11 +1,12 @@
-// Recordatorios de tareas: avisan 1 minuto antes y en el momento en que comienza una tarea
-// (inicio previsto) de cualquier proyecto abierto, solo a sus responsables: los usuarios asignados
+// Recordatorios de tareas: avisan con la anticipación que elige cada usuario (por defecto 1 minuto
+// antes y al comenzar) de cada tarea con inicio previsto de un proyecto abierto, solo a sus responsables: los usuarios asignados
 // a la tarea (pestaña "Equipo" de GLPI) o los miembros de un grupo asignado. Si la tarea no tiene
 // responsables, el aviso le llega al administrador del proyecto. Se avisa de los hitos (tareas y subtareas
 // del último nivel), que son los que se ejecutan; una tarea con subtareas empieza con su primer
 // hito, así que avisar de ambos duplicaría el aviso.
 //
-// El historial se guarda en este teléfono (localStorage), por servidor y usuario.
+// El historial y los tiempos de aviso se guardan en este teléfono (localStorage), por servidor y
+// usuario.
 
 import type { GLPISession, GLPIProjectTask } from '../types/glpi';
 import { GLPIService } from './glpiService';
@@ -21,18 +22,45 @@ export interface TaskReminder {
   asAdmin?: boolean;    // la tarea no tiene responsables: se avisa al administrador del proyecto
 }
 
-export type ReminderKind = 'soon' | 'now'; // 1 minuto antes / al comenzar
+export type ReminderKind = 'soon' | 'now'; // antes de comenzar / al comenzar
 
 export interface AppNotification extends TaskReminder {
-  id: string;           // `${taskId}:${kind}:${start}`: cada aviso se dispara una sola vez
+  id: string;           // `${taskId}:${offsetMin}:${start}`: cada aviso se dispara una sola vez
   kind: ReminderKind;
+  offsetMin?: number;   // minutos que faltaban al avisar (0 = al comenzar). Avisos viejos: según kind
   firedAt: number;
   read: boolean;
 }
 
 const MAX_HISTORY = 100;
-export const SOON_MS = 60_000;     // aviso 1 minuto antes
 export const LATE_MS = 5 * 60_000; // si la app se abre tarde, el aviso "comienza ahora" vale 5 min
+
+// Tiempos de aviso (minutos antes del inicio previsto)
+export const DEFAULT_OFFSETS = [1, 0];
+export const PRESET_OFFSETS = [0, 1, 5, 15, 30, 60, 120, 1440];
+export const OFFSETS_CHANGED_EVENT = 'itpocket:reminder-offsets';
+
+/** "1 minuto", "15 minutos", "1 hora", "1 h 30 min", "1 día", "2 días 3 h". */
+export const formatOffset = (minutes: number): string => {
+  if (minutes < 60) return `${minutes} minuto${minutes === 1 ? '' : 's'}`;
+  if (minutes < 1440) {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m ? `${h} h ${m} min` : `${h} hora${h === 1 ? '' : 's'}`;
+  }
+  const d = Math.floor(minutes / 1440);
+  const h = Math.round((minutes % 1440) / 60);
+  return h ? `${d} día${d === 1 ? '' : 's'} ${h} h` : `${d} día${d === 1 ? '' : 's'}`;
+};
+
+export const offsetOf = (n: AppNotification): number => n.offsetMin ?? (n.kind === 'now' ? 0 : 1);
+
+/** Título del aviso: "Comienza ahora" / "Comienza en 1 hora" (o en pasado para el historial). */
+export const reminderTitle = (n: AppNotification, past = false): string => {
+  const offset = offsetOf(n);
+  if (offset === 0) return past ? 'Comenzó' : 'Comienza ahora';
+  return `${past ? 'Comenzaba' : 'Comienza'} en ${formatOffset(offset)}`;
+};
 
 export const reminderTime = (start: string): number => new Date(start.replace(' ', 'T')).getTime();
 
@@ -50,6 +78,28 @@ export const formatReminderTime = (start: string): string => {
 };
 
 export class NotificationService {
+  private static offsetsKey(session: GLPISession): string {
+    return `itpocket_reminder_offsets:${session.baseUrl}:${session.userId || session.username || 'demo'}`;
+  }
+
+  /** Tiempos de aviso del usuario, de mayor a menor anticipación. */
+  static getOffsets(session: GLPISession): number[] {
+    try {
+      const raw = localStorage.getItem(this.offsetsKey(session));
+      const list = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(list)) return [...new Set(list.map(Number).filter(n => n >= 0))].sort((a, b) => b - a);
+    } catch { /* sin localStorage: los de siempre */ }
+    return [...DEFAULT_OFFSETS];
+  }
+
+  static setOffsets(session: GLPISession, offsets: number[]): void {
+    const clean = [...new Set(offsets.filter(n => Number.isFinite(n) && n >= 0).map(Math.round))].sort((a, b) => b - a);
+    try {
+      localStorage.setItem(this.offsetsKey(session), JSON.stringify(clean));
+    } catch { /* sin localStorage: dura mientras la app esté abierta */ }
+    window.dispatchEvent(new CustomEvent(OFFSETS_CHANGED_EVENT, { detail: clean }));
+  }
+
   private static groupsCache = new Map<string, Promise<number[]>>();
 
   /** Grupos de GLPI a los que pertenece el usuario de la sesión. */

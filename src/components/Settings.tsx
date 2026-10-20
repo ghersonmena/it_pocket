@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { GLPISession } from '../types/glpi';
 import { Server, User, Moon, Sun, Smartphone, LogOut, CheckCircle2, Volume2, VolumeX, Play } from 'lucide-react';
 import { isNotificationSoundEnabled, setNotificationSoundEnabled, playNotificationSound } from '../services/notificationSound';
+import { NotificationSettings } from './NotificationSettings';
 import { getThemePreference, setThemePreference } from '../theme';
 import type { ThemePreference } from '../theme';
 
@@ -133,6 +134,8 @@ export const Settings: React.FC<SettingsProps> = ({ session, onLogout }) => {
         </div>
       </div>
 
+      <NotificationSettings session={session} />
+
       {/* Sonido de los avisos de tareas por comenzar */}
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -140,7 +143,7 @@ export const Settings: React.FC<SettingsProps> = ({ session, onLogout }) => {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>Sonido de avisos</div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              {sound ? 'Suena al avisar que una tarea está por comenzar y al concluir un hito' : 'Sin sonidos; los avisos solo vibran'}
+              {sound ? 'Campanita de la app al concluir un hito y en los avisos (si no suena la notificación del teléfono)' : 'Sin sonidos de la app'}
             </div>
           </div>
           <button

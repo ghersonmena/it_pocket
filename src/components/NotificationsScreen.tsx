@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Bell, BellRing, CalendarClock, ChevronRight, CornerDownRight, Trash2 } from 'lucide-react';
-import { reminderTime, formatReminderTime, type AppNotification, type TaskReminder } from '../services/notificationService';
+import { reminderTime, formatReminderTime, reminderTitle, type AppNotification, type TaskReminder } from '../services/notificationService';
 
 interface NotificationsScreenProps {
   history: AppNotification[];
@@ -72,7 +72,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ histor
           <Bell color="var(--primary)" size={22} /> Notificaciones
         </h2>
         <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-          Avisos 1 minuto antes y al comenzar las tareas donde eres responsable (o, si no tienen responsable, de los proyectos que administras), mientras la app está abierta
+          Avisos de las tareas donde eres responsable (o, si no tienen responsable, de los proyectos que administras). Los tiempos de aviso se eligen en Ajustes
         </p>
       </div>
 
@@ -104,7 +104,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ histor
           <Row
             key={n.id}
             icon={<BellRing size={18} />}
-            top={`${n.kind === 'soon' ? 'Comenzaba en 1 minuto' : 'Comenzó'} · ${formatReminderTime(n.start)} · ${timeAgo(n.firedAt, now)}`}
+            top={`${reminderTitle(n, true)} · ${formatReminderTime(n.start)} · ${timeAgo(n.firedAt, now)}`}
             target={n}
             unread={!n.read}
             onClick={() => onOpen(n, n.id)}

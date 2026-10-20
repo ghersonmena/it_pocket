@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { BellRing, X, CornerDownRight } from 'lucide-react';
-import { formatReminderTime, type AppNotification } from '../services/notificationService';
+import { formatReminderTime, reminderTitle, type AppNotification } from '../services/notificationService';
 
 interface NotificationBannersProps {
   banners: AppNotification[];
@@ -39,7 +39,7 @@ const Banner: React.FC<{ n: AppNotification; onOpen: () => void; onDismiss: () =
         </span>
         <span style={{ minWidth: 0 }}>
           <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--brand-amber)' }}>
-            {n.kind === 'soon' ? 'Comienza en 1 minuto' : 'Comienza ahora'} · {formatReminderTime(n.start)}
+            {reminderTitle(n)} · {formatReminderTime(n.start)}
           </span>
           <span style={{ display: 'block', fontSize: '0.9rem', fontWeight: 800, lineHeight: 1.3, overflowWrap: 'anywhere' }}>{n.taskName}</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', fontSize: '0.74rem', color: '#a9afbc', overflowWrap: 'anywhere' }}>

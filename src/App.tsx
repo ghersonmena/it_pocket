@@ -22,6 +22,7 @@ import { useTaskReminders } from './hooks/useTaskReminders';
 import { NotificationBanners } from './components/NotificationBanners';
 import { NotificationsScreen } from './components/NotificationsScreen';
 import type { TaskReminder } from './services/notificationService';
+import { OPEN_TASK_MESSAGE } from './services/deviceNotifications';
 import type { SlideDirection } from './hooks/useSwipeNavigation';
 
 // Orden de los módulos en la barra inferior; deslizar avanza o retrocede en este orden
@@ -197,6 +198,29 @@ export const App: React.FC = () => {
     setSelectedProject({ id: target.projectId, name: target.projectName, percent_done: 0, date: '', date_mod: '' });
     setFocusTaskId(target.taskId);
   };
+
+  // Tocar una notificación del teléfono: con la app abierta llega un mensaje del service worker;
+  // con la app cerrada, la tarea viene en la URL (?openTask=...&project=...)
+  const openReminderRef = React.useRef(openReminder);
+  useEffect(() => { openReminderRef.current = openReminder; });
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const onMessage = (e: MessageEvent) => {
+      if (e.data?.type !== OPEN_TASK_MESSAGE) return;
+      openReminderRef.current({ taskId: Number(e.data.taskId), projectId: Number(e.data.projectId), projectName: e.data.projectName || '', taskName: '', start: '' }, e.data.id || undefined);
+    };
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, []);
+  useEffect(() => {
+    if (!session) return;
+    const params = new URLSearchParams(window.location.search);
+    const taskId = Number(params.get('openTask'));
+    const projectId = Number(params.get('project'));
+    if (!taskId || !projectId) return;
+    window.history.replaceState(null, '', window.location.pathname);
+    openReminderRef.current({ taskId, projectId, projectName: params.get('projectName') || '', taskName: '', start: '' }, params.get('notification') || undefined);
+  }, [session]);
 
   const getHeaderTitle = (): string | undefined => {
     if (selectedProject) return `Proyecto #${selectedProject.id}`;
