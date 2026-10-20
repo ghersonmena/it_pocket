@@ -44,6 +44,9 @@ const Row: React.FC<{ icon: React.ReactNode; top: string; target: TaskReminder; 
         {target.parentName && <CornerDownRight size={12} style={{ flexShrink: 0 }} />}
         {target.parentName ? `${target.parentName} · ` : ''}{target.projectName}
       </span>
+      {target.asAdmin && (
+        <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: 'var(--primary)' }}>Sin responsable · eres el administrador</span>
+      )}
     </span>
     {unread && <span aria-label="Sin leer" style={{ flexShrink: 0, width: '9px', height: '9px', borderRadius: '50%', background: 'var(--brand-amber)' }} />}
     <ChevronRight size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />
@@ -69,13 +72,13 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ histor
           <Bell color="var(--primary)" size={22} /> Notificaciones
         </h2>
         <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-          Avisos 1 minuto antes y al comenzar cada tarea, mientras la app está abierta
+          Avisos 1 minuto antes y al comenzar las tareas donde eres responsable (o, si no tienen responsable, de los proyectos que administras), mientras la app está abierta
         </p>
       </div>
 
       <div style={sectionTitle}>Próximas tareas</div>
       {nextTasks.length === 0 ? (
-        <div className="card" style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>No hay tareas por comenzar en los próximos 7 días.</div>
+        <div className="card" style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>No tienes tareas asignadas por comenzar en los próximos 7 días.</div>
       ) : (
         nextTasks.map(t => (
           <Row key={`${t.taskId}:${t.start}`} icon={<CalendarClock size={18} />} top={formatReminderTime(t.start)} target={t} onClick={() => onOpen(t)} />

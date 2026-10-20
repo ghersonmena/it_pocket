@@ -4,6 +4,7 @@ import {
   NotificationService, reminderTime, SOON_MS, LATE_MS,
   type AppNotification, type ReminderKind, type TaskReminder
 } from '../services/notificationService';
+import { prepareNotificationSound, playNotificationSound } from '../services/notificationSound';
 
 const REFRESH_MS = 10 * 60_000; // volver a buscar tareas próximas
 const TICK_MS = 5_000;          // revisar si toca avisar
@@ -18,6 +19,9 @@ export const useTaskReminders = (session: GLPISession | null) => {
   const [upcoming, setUpcoming] = useState<TaskReminder[]>([]);
   const firedIds = useRef<Set<string>>(new Set());
   const loadingRef = useRef<boolean>(false);
+
+  // El navegador solo deja sonar después del primer toque en la app
+  useEffect(() => { prepareNotificationSound(); }, []);
 
   useEffect(() => {
     const list = session ? NotificationService.loadHistory(session) : [];
@@ -81,6 +85,8 @@ export const useTaskReminders = (session: GLPISession | null) => {
       persist(list => [...fired, ...list]);
       setBanners(prev => [...fired, ...prev].slice(0, MAX_BANNERS));
       try { navigator.vibrate?.([120, 80, 120]); } catch { /* sin vibración */ }
+      // "Comienza ahora" tiene prioridad si llegan los dos avisos a la vez
+      playNotificationSound(fired.some(n => n.kind === 'now') ? 'now' : 'soon');
     };
     check();
     const timer = window.setInterval(check, TICK_MS);

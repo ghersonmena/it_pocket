@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { GLPISession } from '../types/glpi';
-import { Server, User, Moon, Sun, Smartphone, LogOut, CheckCircle2 } from 'lucide-react';
+import { Server, User, Moon, Sun, Smartphone, LogOut, CheckCircle2, Volume2, VolumeX, Play } from 'lucide-react';
+import { isNotificationSoundEnabled, setNotificationSoundEnabled, playNotificationSound } from '../services/notificationSound';
 import { getThemePreference, setThemePreference } from '../theme';
 import type { ThemePreference } from '../theme';
 
@@ -17,6 +18,14 @@ interface SettingsProps {
 
 export const Settings: React.FC<SettingsProps> = ({ session, onLogout }) => {
   const [theme, setTheme] = useState<ThemePreference>(getThemePreference);
+  const [sound, setSound] = useState<boolean>(isNotificationSoundEnabled);
+
+  const toggleSound = () => {
+    const next = !sound;
+    setSound(next);
+    setNotificationSoundEnabled(next);
+    if (next) playNotificationSound('now', true);
+  };
 
   const changeTheme = (pref: ThemePreference) => {
     setTheme(pref);
@@ -122,6 +131,47 @@ export const Settings: React.FC<SettingsProps> = ({ session, onLogout }) => {
             );
           })}
         </div>
+      </div>
+
+      {/* Sonido de los avisos de tareas por comenzar */}
+      <div className="card">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {sound ? <Volume2 size={20} color="var(--primary)" /> : <VolumeX size={20} color="var(--text-muted)" />}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>Sonido de avisos</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              {sound ? 'Suena al avisar que una tarea está por comenzar y al concluir un hito' : 'Sin sonidos; los avisos solo vibran'}
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={sound}
+            aria-label="Sonido de avisos"
+            onClick={toggleSound}
+            style={{
+              position: 'relative', width: '50px', height: '30px', flexShrink: 0, border: 'none', borderRadius: '999px', cursor: 'pointer',
+              background: sound ? 'var(--brand-amber)' : 'var(--border-color)', transition: 'background 0.2s ease'
+            }}
+          >
+            <span style={{
+              position: 'absolute', top: '3px', left: sound ? '23px' : '3px', width: '24px', height: '24px', borderRadius: '50%',
+              background: '#ffffff', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)', transition: 'left 0.2s ease'
+            }} />
+          </button>
+        </div>
+        {sound && (
+          <button
+            type="button"
+            onClick={() => playNotificationSound('soon', true)}
+            style={{
+              marginTop: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '10px',
+              border: '1px solid var(--border-color)', background: 'var(--card-bg)', color: 'var(--primary)', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer'
+            }}
+          >
+            <Play size={14} /> Probar sonido
+          </button>
+        )}
       </div>
 
       {/* Botón de Logout */}

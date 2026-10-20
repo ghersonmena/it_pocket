@@ -46,6 +46,11 @@ const Banner: React.FC<{ n: AppNotification; onOpen: () => void; onDismiss: () =
             {n.parentName && <CornerDownRight size={12} style={{ flexShrink: 0 }} />}
             {n.parentName ? `${n.parentName} · ` : ''}{n.projectName}
           </span>
+          {n.asAdmin && (
+            <span style={{ display: 'block', marginTop: '3px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-amber)' }}>
+              Sin responsable: te avisamos como administrador del proyecto
+            </span>
+          )}
         </span>
       </button>
       <button

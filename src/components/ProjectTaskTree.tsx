@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { GLPISession, GLPIProject, GLPIProjectTask, ProjectTaskNode, TaskParticipant, LinkedElement } from '../types/glpi';
 import { GLPIService } from '../services/glpiService';
 import { ProjectTaskService } from '../services/projectTaskService';
+import { playNotificationSound } from '../services/notificationSound';
 import { TaskFormView } from './TaskFormView';
 import { TaskDetailView } from './TaskDetailView';
 import { TaskNotes } from './TaskNotes';
@@ -387,6 +388,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
 
     try {
       const updated = await GLPIService.completeTaskMilestone(session, node.id, project.id);
+      playNotificationSound('done');
 
       // Actualizar estado plano local con lo mismo que se guardó en GLPI y recalcular hacia arriba
       const next = flatTasks.map(t => (t.id === node.id
@@ -1044,7 +1046,10 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
           taskId={assigningNode.id}
           taskName={assigningNode.name}
           participants={participants[assigningNode.id] || []}
-          onChange={(list) => setParticipants(prev => ({ ...prev, [assigningNode.id]: list }))}
+          onChange={(list) => {
+            setParticipants(prev => ({ ...prev, [assigningNode.id]: list }));
+            onTasksChanged?.(); // los avisos son solo para los responsables
+          }}
           onClose={() => setAssigningNode(null)}
         />
       )}

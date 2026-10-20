@@ -725,7 +725,7 @@ export class GLPIService {
    */
   static async getProjectTasks(session: GLPISession, projectId: number): Promise<GLPIProjectTask[]> {
     if (session.isMock) {
-      return [...(MOCK_PROJECT_TASKS[projectId] || MOCK_PROJECT_TASKS[1] || [])];
+      return [...this.mockProjectTasks(projectId)];
     }
     return this.tasksOfProject(await this.loadAllProjectTasks(session), projectId);
   }
@@ -1727,7 +1727,8 @@ export class GLPIService {
    */
   /** Tareas demo de un proyecto (para crear tareas en modo demo). */
   static mockProjectTasks(projectId: number): GLPIProjectTask[] {
-    return (MOCK_PROJECT_TASKS[projectId] ||= []);
+    // Los proyectos demo sin tareas propias reciben una copia de las del proyecto 1
+    return (MOCK_PROJECT_TASKS[projectId] ||= (MOCK_PROJECT_TASKS[1] || []).map(t => ({ ...t, projects_id: projectId })));
   }
 
   static async getClosedProjectStateId(session: GLPISession): Promise<number> {
@@ -1768,8 +1769,7 @@ export class GLPIService {
     const nowStr = this.toGlpiDateTime(new Date());
 
     if (session.isMock) {
-      const tasks = MOCK_PROJECT_TASKS[currentProjectId] || MOCK_PROJECT_TASKS[1] || [];
-      const found = tasks.find(t => t.id === taskId);
+      const found = this.mockProjectTasks(currentProjectId).find(t => t.id === taskId);
       if (found) {
         found.percent_done = 100;
         found.state = 3;
@@ -1888,6 +1888,7 @@ const MOCK_ELEMENT_DETAILS: Record<string, ElementDetails> = {
 };
 
 const MOCK_USERS: GLPIUserOption[] = [
+  { id: 1, name: 'GLPI Demo', login: 'demo' }, // el usuario de la sesión demo
   { id: 3, name: 'Ana López', login: 'alopez' },
   { id: 4, name: 'Carlos Ruiz', login: 'cruiz' },
   { id: 2, name: 'Juan Pérez', login: 'jperez' }

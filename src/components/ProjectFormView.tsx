@@ -87,6 +87,8 @@ export const ProjectFormView: React.FC<ProjectFormViewProps> = ({ session, onBac
   const handleSave = async () => {
     if (!form.name.trim()) { setError('Escribe el nombre del proyecto.'); return; }
     if (!form.projectstates_id) { setError('Elige el estado del proyecto.'); return; }
+    // Siempre debe haber administrador: recibe los avisos de las tareas sin responsable
+    if (!form.users_id) { setError('Elige al administrador del proyecto.'); return; }
     setSaving(true);
     setError('');
     try {
@@ -233,15 +235,19 @@ export const ProjectFormView: React.FC<ProjectFormViewProps> = ({ session, onBac
       <div className="card">
         <div style={sectionTitle}>Equipo</div>
         <div className="form-group">
-          <label className="form-label">Administrador del proyecto</label>
+          <label className="form-label">Administrador del proyecto *</label>
           <SearchSelect
             label="Administrador del proyecto"
             value={form.users_id}
             options={userOptions}
             loading={loadingCatalogs}
             disabled={saving}
+            placeholder="Elige al administrador"
             onChange={id => set('users_id', id)}
           />
+          <div style={{ marginTop: '6px', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+            Recibe los avisos de las tareas que no tienen responsable.
+          </div>
         </div>
         <div className="form-group" style={{ marginBottom: 0 }}>
           <label className="form-label">Integrantes</label>
