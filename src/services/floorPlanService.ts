@@ -64,12 +64,12 @@ const serialize = (markers: FloorMarker[]) => JSON.stringify({
 
 // ── Modo demo ───────────────────────────────────────────────────────────────
 const MOCK_LOCATIONS: LocationNode[] = [
-  { id: 10, name: 'Oficinas ACERO', completename: 'Oficinas ACERO', parentId: 0, level: 1 },
-  { id: 11, name: 'Planta Baja', completename: 'Oficinas ACERO > Planta Baja', parentId: 10, level: 2 },
-  { id: 12, name: 'Sistemas', completename: 'Oficinas ACERO > Planta Baja > Sistemas', parentId: 11, level: 3 },
-  { id: 1, name: '8 Posicion', completename: 'Oficinas ACERO > Planta Baja > Sistemas > 8 Posicion', parentId: 12, level: 4 },
-  { id: 13, name: 'Recepcion', completename: 'Oficinas ACERO > Planta Baja > Recepcion', parentId: 11, level: 3 },
-  { id: 14, name: 'Site de Sistemas', completename: 'Oficinas ACERO > Planta Baja > Sistemas > Site de Sistemas', parentId: 12, level: 4 }
+  { id: 10, name: 'Oficina Central', completename: 'Oficina Central', parentId: 0, level: 1 },
+  { id: 11, name: 'Planta Baja', completename: 'Oficina Central > Planta Baja', parentId: 10, level: 2 },
+  { id: 12, name: 'Sistemas', completename: 'Oficina Central > Planta Baja > Sistemas', parentId: 11, level: 3 },
+  { id: 1, name: 'Posición 8', completename: 'Oficina Central > Planta Baja > Sistemas > Posición 8', parentId: 12, level: 4 },
+  { id: 13, name: 'Recepción', completename: 'Oficina Central > Planta Baja > Recepción', parentId: 11, level: 3 },
+  { id: 14, name: 'Cuarto de servidores', completename: 'Oficina Central > Planta Baja > Sistemas > Cuarto de servidores', parentId: 12, level: 4 }
 ];
 const mockPlans: Record<number, { plan: FloorPlan; url: string }> = {};
 

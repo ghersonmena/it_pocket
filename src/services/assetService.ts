@@ -175,14 +175,14 @@ const readError = async (res: Response): Promise<string> => {
 let mockSeq = 1000;
 const MOCK_ASSETS: Record<string, (AssetForm & { id: number })[]> = {
   Computer: [
-    { ...emptyAssetForm(), id: 89, name: 'GhersonMenaPC', serial: 'MXL1234ABC', otherserial: 'INV-0103', physicalTag: 'PC-000103', locations_id: 2, states_id: 1, users_id: 2 }
+    { ...emptyAssetForm(), id: 89, name: 'PC-SIS-01', serial: 'MXL1234ABC', otherserial: 'INV-0103', physicalTag: 'PC-000103', locations_id: 2, states_id: 1, users_id: 2 }
   ],
   Monitor: [{ ...emptyAssetForm(), id: 12, name: 'MON-SIS-01', serial: 'CN0ABC123', locations_id: 1, states_id: 1 }]
 };
 const MOCK_DROPDOWNS: Record<string, DropdownOption[]> = {
   Location: [
-    { id: 1, label: 'Oficinas ACERO > Planta Baja > Sistemas > 8 Posicion' },
-    { id: 2, label: 'Oficinas ACERO > Planta Alta > Ejecutivas de Cuenta > Hilera 3 > 4 Posicion' }
+    { id: 1, label: 'Oficina Central > Planta Baja > Sistemas > Posición 8' },
+    { id: 2, label: 'Oficina Central > Planta Alta > Ventas > Fila 3 > Posición 4' }
   ],
   State: [{ id: 1, label: 'En uso' }, { id: 2, label: 'En almacén' }],
   Manufacturer: [{ id: 1, label: 'Dell' }, { id: 2, label: 'HP' }, { id: 3, label: 'Lenovo' }]
@@ -196,7 +196,7 @@ const MOCK_TECH: AssetTechInfo = {
 };
 
 const MOCK_NETWORK: NetworkPortInfo[] = [
-  { id: 1, name: 'Ethernet', mac: '74:56:3c:9a:8d:c4', ips: [{ address: '10.11.21.59', version: 4, useful: true }], virtual: false },
+  { id: 1, name: 'Ethernet', mac: '00:1a:2b:3c:4d:5e', ips: [{ address: '192.168.1.50', version: 4, useful: true }], virtual: false },
   { id: 2, name: 'Loopback', ips: [{ address: '127.0.0.1', version: 4, useful: false }], virtual: true }
 ];
 

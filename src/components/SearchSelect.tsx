@@ -17,7 +17,7 @@ interface SearchSelectProps {
   onChange: (id: number) => void;
 }
 
-// Etiquetas jerárquicas de GLPI ("Oficinas ACERO > Planta Alta > ... > 4 Posicion"): el camino
+// Etiquetas jerárquicas de GLPI ("Oficina Central > Planta Alta > ... > Posición 4"): el camino
 // va en una línea pequeña y el último nivel (el lugar exacto) en negritas debajo. Así se lee la
 // ruta completa aunque sea larga, sin cortarla con "…".
 const HierarchicalLabel: React.FC<{ label: string; color: string; strong?: boolean }> = ({ label, color, strong }) => {

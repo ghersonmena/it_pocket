@@ -206,7 +206,7 @@ export const AssetsScreen: React.FC<AssetsScreenProps> = ({ session, onFormOpenC
   }
 
   // Busca en nombre, etiqueta, serie, inventario, ubicación y usuario asignado. Cada palabra
-  // debe aparecer en algún campo, en cualquier orden ("gherson pc" encuentra GhersonMenaPC)
+  // debe aparecer en algún campo, en cualquier orden ("pc sis" encuentra PC-SIS-01)
   const words = normalize(search.trim()).split(/\s+/).filter(Boolean);
   const query = words.join(' ');
   const filtered = words.length
