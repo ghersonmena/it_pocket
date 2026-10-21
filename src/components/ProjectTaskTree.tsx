@@ -147,20 +147,20 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
   };
 
   // Fechas, duraciones, avance y estado de las tareas padre y del proyecto (se guardan en GLPI)
-  const runSync = async (tasks: GLPIProjectTask[], options: { reopenIfPending?: boolean } = {}) => {
+  const runSync = async (tasks: GLPIProjectTask[]) => {
     try {
-      const result = await ProjectTaskService.syncRollups(session, project.id, tasks, options);
+      const result = await ProjectTaskService.syncRollups(session, project.id, tasks);
       setFlatTasks(result.tasks);
       setPlanEnd(result.planEnd);
       if (result.projectClosed) showToast('Se concluyó el último hito: el proyecto quedó cerrado con su fecha de fin real.', 5000);
-      if (result.projectReopened) showToast('El proyecto estaba cerrado y tiene tareas nuevas: se reabrió (en proceso, sin fecha de fin real).', 5000);
+      if (result.projectReopened) showToast('El proyecto estaba cerrado y tiene tareas pendientes: se reabrió (en proceso, sin fecha de fin real).', 5000);
     } catch (err) {
       console.warn('No se pudieron actualizar los cálculos del proyecto:', err);
       setPlanEnd(prev => (prev === undefined ? null : prev));
     }
   };
 
-  const fetchTasks = async (isRefresh = false, syncOptions: { reopenIfPending?: boolean } = {}) => {
+  const fetchTasks = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
 
@@ -175,7 +175,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
       setFlatTasks(data);
 
       // Cálculos automáticos (tareas padre, fin previsto y cierre del proyecto)
-      runSync(data, syncOptions);
+      runSync(data);
 
       // Los nombres de los participantes llegan después, sin retrasar el árbol
       setParticipantsLoaded(false);
@@ -778,8 +778,8 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
           popView();
           if (parentId) setExpandedNodes(prev => ({ ...prev, [parentId]: true }));
           showToast(parentId ? 'Subtarea creada en GLPI.' : 'Tarea creada en GLPI.');
-          // Si el proyecto estaba cerrado, las tareas nuevas lo reabren
-          await fetchTasks(true, { reopenIfPending: true });
+          // Si el proyecto estaba cerrado, las tareas nuevas lo reabren (runSync)
+          await fetchTasks(true);
           onTasksChanged?.();
         }}
       />

@@ -23,7 +23,7 @@ import { NotificationBanners } from './components/NotificationBanners';
 import { NotificationsScreen } from './components/NotificationsScreen';
 import type { TaskReminder } from './services/notificationService';
 import { OPEN_TASK_MESSAGE } from './services/deviceNotifications';
-import { refreshPushSubscription, unsubscribePush } from './services/pushClient';
+import { refreshPushSubscription, unsubscribePush, notifyTasksChanged } from './services/pushClient';
 import { NotificationService } from './services/notificationService';
 import type { SlideDirection } from './hooks/useSwipeNavigation';
 
@@ -267,7 +267,7 @@ export const App: React.FC = () => {
             onBack={() => setSelectedProject(null)}
             focusTaskId={focusTaskId}
             onFocusHandled={() => setFocusTaskId(null)}
-            onTasksChanged={reminders.refresh}
+            onTasksChanged={() => { reminders.refresh(); notifyTasksChanged(session); }}
           />
         ) : selectedTicket ? (
           <TicketDetail

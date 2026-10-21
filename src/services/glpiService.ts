@@ -910,6 +910,29 @@ export class GLPIService {
       emptyInARow = found.length === 0 ? emptyInARow + 1 : 0;
     }
 
+    // Fase 3: un hueco grande de tareas borradas puede esconder tareas más nuevas. Se sondean IDs
+    // a saltos más allá del hueco (+50, +100, +200, +400); si aparece alguna, se recorre el tramo
+    // y se sigue explorando desde ahí.
+    for (let round = 0; round < 10; round++) {
+      const probes = [50, 100, 200, 400].map(step => nextId + step);
+      const found = (await Promise.all(probes.map(id => fetchIds([id], 'singles')))).flat();
+      if (found.length === 0) break;
+      const target = Math.max(...found.map((x: any) => Number(x.id)));
+      const gap: number[] = [];
+      for (let id = nextId; id <= target; id++) gap.push(id);
+      const gapBatches: number[][] = [];
+      for (let i = 0; i < gap.length; i += batchSize) gapBatches.push(gap.slice(i, i + batchSize));
+      items.push(...(await Promise.all(gapBatches.map(batch => fetchIds(batch)))).flat());
+      nextId = target + 1;
+      emptyInARow = 0;
+      while (emptyInARow < emptyTailBatchesToStop && nextId < 100000) {
+        const more = await fetchIds(Array.from({ length: tailBatchSize }, (_, i) => nextId + i), 'singles');
+        nextId += tailBatchSize;
+        items.push(...more);
+        emptyInARow = more.length === 0 ? emptyInARow + 1 : 0;
+      }
+    }
+
     // Guardar los IDs inexistentes por debajo del máximo encontrado (borrados definitivamente)
     try {
       const foundIds = new Set(items.map((x: any) => Number(x.id)));

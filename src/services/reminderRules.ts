@@ -2,8 +2,9 @@
 // (notificationService / useTaskReminders) y el servicio push (push-service), para que ambos
 // avisen exactamente igual.
 //
-// - Se avisa de los hitos (tareas y subtareas del último nivel) con inicio previsto, sin concluir,
-//   de proyectos abiertos. Una tarea con subtareas empieza con su primer hito.
+// - Se avisa de los hitos (tareas y subtareas del último nivel) con inicio previsto y sin concluir,
+//   aunque el proyecto esté marcado como cerrado (si tiene hitos pendientes, se reabre al abrirlo
+//   en la app). Una tarea con subtareas empieza con su primer hito.
 // - El aviso es para los responsables de la tarea (usuarios o miembros de un grupo asignado); si la
 //   tarea no tiene responsables, para el administrador del proyecto.
 // - Cada usuario elige con cuánta anticipación (offsets, en minutos; 0 = al comenzar). Si se avisa
@@ -111,7 +112,7 @@ export const candidateReminders = (src: ReminderSource): { reminders: TaskRemind
   const reminders: TaskReminder[] = [];
   const adminOf = new Map<number, number>();
   src.projects
-    .filter((p: any) => !Number(p.is_deleted) && !Number(p.is_template) && Number(p.projectstates_id) !== src.closedStateId)
+    .filter((p: any) => !Number(p.is_deleted) && !Number(p.is_template))
     .forEach((p: any) => {
       adminOf.set(Number(p.id), Number(p.users_id) || 0);
       const tasks = src.tasksByProject.get(Number(p.id)) || [];

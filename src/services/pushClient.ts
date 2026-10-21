@@ -96,3 +96,16 @@ export const refreshPushSubscription = async (session: GLPISession, offsets: num
   if (!status.enabled || !status.publicKey) return;
   await subscribePush(session, status.publicKey, offsets).catch(err => console.warn('[Push] No se pudo renovar la suscripción:', err));
 };
+
+/**
+ * Avisa al servicio push que cambiaron tareas (alta, edición, responsables) para que recargue de
+ * inmediato y los avisos de todos los usuarios queden al día. Sin servicio push no hace nada.
+ */
+export const notifyTasksChanged = (session: GLPISession): void => {
+  if (session.isMock) return;
+  fetch('/push/refresh', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionToken: session.sessionToken })
+  }).catch(() => { /* sin servicio push */ });
+};

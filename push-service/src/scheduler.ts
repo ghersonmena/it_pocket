@@ -1,5 +1,6 @@
 // Revisa las tareas de GLPI y manda los avisos por Web Push. Solo consulta GLPI si hay teléfonos
-// suscritos. Los datos de GLPI se recargan cada 2 minutos; los avisos se revisan cada 20 segundos.
+// suscritos. Los datos de GLPI se recargan cada minuto (y al instante cuando la app avisa que
+// cambiaron tareas); los avisos se revisan cada 20 segundos.
 
 import webpush from 'web-push';
 import type { PushConfig } from './config';
@@ -9,7 +10,7 @@ import {
   candidateReminders, remindersForUser, dueReminder, notificationText, type TaskReminder
 } from '../../src/services/reminderRules';
 
-const DATA_REFRESH_MS = 2 * 60_000;
+const DATA_REFRESH_MS = 60_000;
 const TICK_MS = 20_000;
 const GROUPS_TTL_MS = 10 * 60_000;
 const PUSH_TTL_S = 10 * 60; // si el teléfono está sin red, el aviso espera hasta 10 min
@@ -66,7 +67,12 @@ const groupsOf = async (config: PushConfig, userId: number): Promise<number[]> =
 };
 
 /** Pide recargar las tareas en la siguiente revisión (p. ej. al suscribirse un teléfono). */
-export const invalidateSnapshot = () => { if (snapshot) snapshot.loadedAt = 0; };
+export const invalidateSnapshot = () => {
+  if (snapshot) snapshot.loadedAt = 0;
+  runNow?.();
+};
+
+let runNow: (() => void) | null = null;
 
 const tick = async (config: PushConfig) => {
   const subs = getSubscriptions();
@@ -113,6 +119,7 @@ export const startScheduler = (config: PushConfig) => {
     running = true;
     try { await tick(config); } finally { running = false; }
   };
+  runNow = run;
   run();
   setInterval(run, TICK_MS);
 };

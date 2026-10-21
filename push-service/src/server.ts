@@ -3,8 +3,15 @@
 //   POST /push/subscribe     → { subscription, offsets, sessionToken }
 //   POST /push/preferences   → { endpoint, offsets, sessionToken }
 //   POST /push/unsubscribe   → { endpoint }
+//   POST /push/refresh       → { sessionToken }  (la app avisa que cambiaron tareas: recarga ya)
 // La sesión de GLPI de la app se verifica con GLPI en cada alta o cambio, así un teléfono solo
 // puede recibir los avisos de quien inició sesión en él.
+
+// Cada línea del log con su fecha y hora (zona del contenedor, PUSH_TZ)
+for (const level of ['log', 'error'] as const) {
+  const original = console[level].bind(console);
+  console[level] = (...args: unknown[]) => original(new Date().toLocaleString('sv-SE'), ...args);
+}
 
 import http from 'node:http';
 import webpush from 'web-push';
@@ -89,6 +96,15 @@ const server = http.createServer(async (req, res) => {
       if (!userId) return send(res, 401, { error: 'La sesión de GLPI no es válida' });
       const ok = store.updateOffsets(String(endpoint || ''), userId, cleanOffsets(Array.isArray(offsets) ? offsets : []));
       return send(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'Suscripción no encontrada' });
+    }
+
+    if (route === 'POST /push/refresh') {
+      const { sessionToken } = await readBody(req);
+      const userId = await glpi.verifyAppSession(config, String(sessionToken || ''));
+      if (!userId) return send(res, 401, { error: 'La sesión de GLPI no es válida' });
+      scheduler?.invalidateSnapshot();
+      console.log(`[push] El usuario ${userId} cambió tareas: se recargan ya`);
+      return send(res, 200, { ok: true });
     }
 
     if (route === 'POST /push/unsubscribe') {
