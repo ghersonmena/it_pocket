@@ -6,6 +6,7 @@ import { ProjectTaskService } from '../services/projectTaskService';
 import { playNotificationSound } from '../services/notificationSound';
 import { TaskFormView } from './TaskFormView';
 import { TaskDetailView } from './TaskDetailView';
+import { GanttView } from './GanttView';
 import { TaskNotes } from './TaskNotes';
 import { TaskPhotos } from './TaskPhotos';
 import { AssignParticipants } from './AssignParticipants';
@@ -140,6 +141,8 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
   const pushView = (next: TreeView) => setViewStack(stack => [...stack, next]);
   const popView = () => setViewStack(stack => stack.slice(0, -1));
   const [projectNotesOpen, setProjectNotesOpen] = useState<boolean>(false);
+  // Vista de las tareas: árbol (lista) o diagrama de Gantt
+  const [taskView, setTaskView] = useState<'tree' | 'gantt'>('tree');
 
   const showToast = (msg: string, ms = 3500) => {
     setToastMsg(msg);
@@ -957,7 +960,27 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
           Tareas del proyecto ({treeNodes.length})
         </h4>
 
-        <div style={{ display: 'flex', gap: '6px' }}>
+        <div style={{ display: 'flex', gap: '2px', padding: '3px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '10px' }}>
+          {([['tree', 'Árbol'], ['gantt', 'Gantt']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTaskView(key)}
+              aria-pressed={taskView === key}
+              style={{
+                padding: '4px 10px', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: 700, fontSize: '0.74rem',
+                background: taskView === key ? 'var(--card-bg)' : 'transparent', boxShadow: taskView === key ? 'var(--shadow-sm)' : 'none',
+                color: taskView === key ? 'var(--primary)' : 'var(--text-muted)'
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {taskView === 'tree' && treeNodes.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', margin: '-4px 4px 10px' }}>
           <button
             onClick={handleExpandAll}
             style={{
@@ -989,7 +1012,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
             Colapsar
           </button>
         </div>
-      </div>
+      )}
 
       {viewingElements && (
         <ElementDetailSheet
@@ -1064,6 +1087,8 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
         <div className="card" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
           No hay tareas registradas para este proyecto. Toca el botón + para crear la primera.
         </div>
+      ) : taskView === 'gantt' ? (
+        <GanttView nodes={treeNodes} onOpenTask={id => pushView({ kind: 'task', id })} />
       ) : (
         <div>
           {treeNodes.map(node => renderTreeNode(node))}
