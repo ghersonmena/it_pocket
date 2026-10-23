@@ -73,9 +73,9 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
-    if (!editing || !isMilestone || states.length) return;
+    if (!editing || !isMilestone || isDone || states.length) return;
     GLPIService.getOpenProjectStates(session).then(setStates).catch(() => { /* sin catálogo: no se edita el estado */ });
-  }, [editing, isMilestone, session, states.length]);
+  }, [editing, isMilestone, isDone, session, states.length]);
 
   const startEdit = () => {
     setName(node.name);
@@ -95,7 +95,8 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
         name,
         content,
         projecttasks_id: node.projecttasks_id,
-        ...(isMilestone && !isDone ? { plan_start_date: planStart, projectstates_id: stateId || undefined } : {})
+        // La fecha prevista de un hito se puede corregir aunque ya esté concluido; el estado, no
+        ...(isMilestone ? { plan_start_date: planStart, projectstates_id: isDone ? undefined : stateId || undefined } : {})
       }, isMilestone);
       await onSaved();
       setEditing(false);
@@ -168,7 +169,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
               <label className="form-label" htmlFor="edit-task-content">Descripción</label>
               <textarea id="edit-task-content" className="form-input" value={content} onChange={e => setContent(e.target.value)} rows={4} disabled={saving} style={{ resize: 'vertical', padding: '10px 12px' }} />
             </div>
-            {isMilestone && !isDone && (
+            {isMilestone && (
               <>
                 <div className="form-group">
                   <label className="form-label" htmlFor="edit-task-start">Inicio previsto</label>
@@ -177,7 +178,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
                     <input id="edit-task-start" type="datetime-local" className="form-input" value={planStart} onChange={e => setPlanStart(e.target.value)} disabled={saving} />
                   </div>
                 </div>
-                {states.length > 0 && (
+                {!isDone && states.length > 0 && (
                   <div className="form-group">
                     <label className="form-label">Estado</label>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
