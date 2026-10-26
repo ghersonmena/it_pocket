@@ -31,6 +31,7 @@
   --gantt-bar: #ece9e2;
   --gantt-weekend: rgba(28, 31, 38, 0.04);
   --gantt-row-line: rgba(28, 31, 38, 0.06);
+  --delay-text: #a16207;
 }
 
 [data-theme='dark'] {
@@ -49,6 +50,7 @@
   --gantt-bar: #2e333d;
   --gantt-weekend: rgba(255, 255, 255, 0.035);
   --gantt-row-line: rgba(255, 255, 255, 0.05);
+  --delay-text: #facc15;
 }
 
 * {

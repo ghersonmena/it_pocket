@@ -7,6 +7,7 @@ import { playNotificationSound } from '../services/notificationSound';
 import { TaskFormView } from './TaskFormView';
 import { TaskDetailView } from './TaskDetailView';
 import { GanttView } from './GanttView';
+import { SwipeToComplete } from './SwipeToComplete';
 import { TaskNotes } from './TaskNotes';
 import { TaskPhotos } from './TaskPhotos';
 import { AssignParticipants } from './AssignParticipants';
@@ -432,6 +433,8 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
 
     return (
       <div key={node.id} style={{ marginBottom: '6px' }}>
+        {/* Hito pendiente: deslizar a la derecha para concluirlo */}
+        <SwipeToComplete enabled={!hasChildren && !isCompleted && !isUpdating} onComplete={() => handleToggleComplete(node)}>
         <div
           onClick={() => (hasChildren ? toggleExpand(node.id) : pushView({ kind: 'task', id: node.id }))}
           style={{
@@ -718,6 +721,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
             </button>
           </div>
         </div>
+        </SwipeToComplete>
 
         {isEquipment && openPhotos[node.id] && (
           <TaskPhotos

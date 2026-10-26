@@ -15,6 +15,16 @@ const WORK_START = 8;   // horario laboral (las demás horas se sombrean en el z
 const WORK_END = 19;
 const ZOOM_LABEL: Record<Zoom, string> = { day: 'Día', week: 'Semana', month: 'Mes', year: 'Año' };
 const DAY_MS = 86_400_000;
+// Retraso de un hito: de la fecha prevista a hoy (pendiente) o a la fecha en que se concluyó
+const DELAY_COLOR = '#eab308';
+const formatDelay = (ms: number): string => {
+  const hours = ms / 3_600_000;
+  if (hours < 1) return `${Math.max(1, Math.round(ms / 60_000))} min`;
+  if (hours < 24) return `${Math.round(hours)} h`;
+  const days = Math.floor(hours / 24);
+  const rest = Math.round(hours % 24);
+  return rest && days < 3 ? `${days} d ${rest} h` : `${days} d`;
+};
 const NAME_W = 132;
 const ROW_H = 40;
 const HEADER_H = 46;
@@ -180,18 +190,37 @@ export const GanttView: React.FC<GanttViewProps> = ({ nodes, onOpenTask }) => {
     const isParent = node.children.length > 0;
     const done = node.percent_done >= 100;
     if (!isParent) {
-      const t = toTime(node.real_start_date) ?? toTime(node.plan_start_date);
-      if (t === null) return <span style={{ position: 'absolute', left: 8, top: 12, fontSize: '0.68rem', color: 'var(--text-muted)' }}>sin fecha</span>;
-      const late = !done && (toTime(node.plan_start_date) ?? Infinity) < now;
-      const color = done ? '#10b981' : late ? '#dc2626' : 'var(--brand-amber)';
-      return (
+      // Hito: rombo hueco en la fecha prevista; si se pasa de ella, línea amarilla del retraso hasta
+      // hoy (pendiente) o hasta que se concluyó (rombo verde en la fecha real, el retraso queda marcado)
+      const plan = toTime(node.plan_start_date);
+      const real = done ? toTime(node.real_start_date) : null;
+      if (plan === null && real === null) return <span style={{ position: 'absolute', left: 8, top: 12, fontSize: '0.68rem', color: 'var(--text-muted)' }}>sin fecha</span>;
+      const delayEnd = done ? real : now;
+      const delay = plan !== null && delayEnd !== null && delayEnd > plan ? delayEnd - plan : 0;
+      const late = !done && delay > 0;
+      const diamond = (t: number, color: string, filled: boolean, title: string) => (
         <span
-          title={node.name}
+          title={title}
           style={{
             position: 'absolute', left: x(t) - 7, top: ROW_H / 2 - 7, width: 14, height: 14, transform: 'rotate(45deg)',
-            borderRadius: 3, background: done ? color : 'var(--card-bg)', border: `3px solid ${color}`, boxSizing: 'border-box'
+            borderRadius: 3, background: filled ? color : 'var(--card-bg)', border: `3px solid ${color}`, boxSizing: 'border-box'
           }}
         />
+      );
+      const labelX = x((delay ? delayEnd : real ?? plan)!) + 12;
+      return (
+        <>
+          {delay > 0 && (
+            <span style={{ position: 'absolute', left: x(plan!), top: ROW_H / 2 - 2, width: Math.max(2, x(delayEnd!) - x(plan!)), height: 4, borderRadius: 2, background: DELAY_COLOR }} />
+          )}
+          {plan !== null && diamond(plan, done ? '#10b981' : late ? DELAY_COLOR : 'var(--brand-amber)', false, `${node.name} · previsto`)}
+          {real !== null && diamond(real, '#10b981', true, `${node.name} · concluido`)}
+          {delay > 0 && (
+            <span style={{ position: 'absolute', left: labelX, top: ROW_H / 2 - 8, fontSize: '0.66rem', fontWeight: 800, color: 'var(--delay-text)', whiteSpace: 'nowrap' }}>
+              +{formatDelay(delay)}
+            </span>
+          )}
+        </>
       );
     }
     const s = toTime(node.plan_start_date);
@@ -339,9 +368,9 @@ export const GanttView: React.FC<GanttViewProps> = ({ nodes, onOpenTask }) => {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', marginTop: '10px', fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 22, height: 10, borderRadius: 5, background: 'var(--gantt-bar)', border: '1px solid var(--border-color)', overflow: 'hidden', display: 'inline-flex' }}><span style={{ width: '55%', background: 'var(--primary-gradient)' }} /></span>Previsto y avance</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 22, height: 3, borderRadius: 2, background: '#10b981' }} />Real</span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, transform: 'rotate(45deg)', borderRadius: 2, border: '2.5px solid var(--brand-amber)', boxSizing: 'border-box' }} />Hito</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, transform: 'rotate(45deg)', borderRadius: 2, border: '2.5px solid var(--brand-amber)', boxSizing: 'border-box' }} />Hito previsto</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, transform: 'rotate(45deg)', borderRadius: 2, background: '#10b981' }} />Concluido</span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, transform: 'rotate(45deg)', borderRadius: 2, border: '2.5px solid #dc2626', boxSizing: 'border-box' }} />Atrasado</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 22, height: 4, borderRadius: 2, background: DELAY_COLOR }} />Retraso</span>
       </div>
     </div>
   );
