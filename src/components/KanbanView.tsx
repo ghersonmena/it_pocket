@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { GLPISession, ProjectTaskNode, TaskParticipant, ProjectCatalogOption } from '../types/glpi';
 import { GLPIService } from '../services/glpiService';
 import { ProjectTaskService } from '../services/projectTaskService';
@@ -56,6 +57,23 @@ const pendingFirst = (cols: Column[]): Column[] => {
   return cols;
 };
 
+// Arrastrar tarjetas: mantener presionado (táctil) o mover el mouse unos píxeles para tomarla
+const HOLD_MS = 350;
+const MOVE_TOLERANCE = 8;
+const EDGE = 48; // orilla del tablero o de la pantalla que activa el desplazamiento automático
+const SCROLL_SPEED = 14;
+
+interface DragState {
+  card: Card;
+  from: string;
+  x: number;
+  y: number;
+  dx: number;
+  dy: number;
+  width: number;
+  over: string | null;
+}
+
 const formatDelay = (ms: number): string => {
   const hours = ms / 3_600_000;
   if (hours < 1) return `${Math.max(1, Math.round(ms / 60_000))} min`;
@@ -76,6 +94,13 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   const [moving, setMoving] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [now] = useState<number>(() => Date.now());
+  const [drag, setDrag] = useState<DragState | null>(null);
+  // Concluir no se puede deshacer (fija la fecha real): al soltar en Concluido se confirma
+  const [confirmDone, setConfirmDone] = useState<ProjectTaskNode | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<DragState | null>(null);
+  const press = useRef<{ timer: number; x: number; y: number; card: Card; from: string; el: HTMLElement; mouse: boolean } | null>(null);
+  const swallowClick = useRef(false);
 
   useEffect(() => {
     GLPIService.getOpenProjectStates(session).then(setStates).catch(() => { /* sin catálogo: solo se puede concluir */ });
@@ -162,6 +187,97 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     return pendingFirst([...map.values()]);
   }, [cards, criterion, hideDone, states, newId, now, participants]);
 
+  // Lo último de columnas y acciones, para usarlo al soltar la tarjeta
+  const columnsRef = useRef(columns);
+  const actionsRef = useRef({ onComplete, onMoveState });
+  useEffect(() => {
+    columnsRef.current = columns;
+    actionsRef.current = { onComplete, onMoveState };
+  });
+
+  const updateDrag = (next: DragState | null) => {
+    dragRef.current = next;
+    setDrag(next);
+  };
+
+  // Columna bajo el dedo (la tarjeta flotante no recibe eventos, así que no estorba)
+  const columnAt = (x: number, y: number): string | null =>
+    (document.elementFromPoint(x, y)?.closest('[data-col]') as HTMLElement | null)?.dataset.col ?? null;
+
+  const startDrag = (x: number, y: number) => {
+    const p = press.current;
+    if (!p) return;
+    const rect = p.el.getBoundingClientRect();
+    navigator.vibrate?.(15);
+    setMoving(null);
+    updateDrag({ card: p.card, from: p.from, x, y, dx: x - rect.left, dy: y - rect.top, width: rect.width, over: p.from });
+  };
+
+  const cancelPress = () => {
+    if (press.current) window.clearTimeout(press.current.timer);
+    press.current = null;
+  };
+
+  // Mientras se arrastra: seguir el dedo, desplazar el tablero en las orillas y soltar
+  useEffect(() => {
+    if (!drag) return;
+    let frame = 0;
+    const autoScroll = () => {
+      const d = dragRef.current;
+      const board = boardRef.current;
+      if (d && board) {
+        const r = board.getBoundingClientRect();
+        if (d.x < r.left + EDGE) board.scrollLeft -= SCROLL_SPEED;
+        else if (d.x > r.right - EDGE) board.scrollLeft += SCROLL_SPEED;
+        const page = document.querySelector('.app-content');
+        if (page) {
+          if (d.y < 150) page.scrollTop -= SCROLL_SPEED;
+          else if (d.y > window.innerHeight - 90) page.scrollTop += SCROLL_SPEED;
+        }
+        const over = columnAt(d.x, d.y);
+        if (over !== d.over) updateDrag({ ...d, over });
+      }
+      frame = requestAnimationFrame(autoScroll);
+    };
+    frame = requestAnimationFrame(autoScroll);
+
+    const onMove = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (d) updateDrag({ ...d, x: e.clientX, y: e.clientY, over: columnAt(e.clientX, e.clientY) });
+    };
+    const onUp = () => {
+      const d = dragRef.current;
+      updateDrag(null);
+      press.current = null;
+      swallowClick.current = true;
+      setTimeout(() => { swallowClick.current = false; }, 400);
+      if (!d || !d.over || d.over === d.from) return;
+      const target = columnsRef.current.find(c => c.key === d.over);
+      if (!target || target.stateId === undefined) return;
+      if (target.stateId === 0) setConfirmDone(d.card.node);
+      else actionsRef.current.onMoveState(d.card.node, target.stateId);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, [drag !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // El navegador decide al tocar si el gesto hará scroll: un listener no pasivo permanente en el
+  // tablero permite cancelar el scroll una vez que la tarjeta se tomó
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board) return;
+    const block = (e: TouchEvent) => { if (dragRef.current) e.preventDefault(); };
+    board.addEventListener('touchmove', block, { passive: false });
+    return () => board.removeEventListener('touchmove', block);
+  }, [columns.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const chip = (active: boolean): React.CSSProperties => ({
     padding: '6px 12px', border: 'none', borderRadius: '9px', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem', whiteSpace: 'nowrap',
     background: active ? 'var(--card-bg)' : 'transparent', boxShadow: active ? 'var(--shadow-sm)' : 'none',
@@ -179,18 +295,42 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     const targets = criterion === 'state' && !done
       ? columns.filter(c => c.key !== column.key && c.stateId !== undefined)
       : [];
+    const draggable = targets.length > 0 && !busy;
+    const isDragged = drag?.card.node.id === node.id;
 
     return (
       <div
         key={`${column.key}-${node.id}`}
         role="button"
         tabIndex={0}
-        onClick={() => onOpenTask(node.id)}
+        onClick={() => { if (!swallowClick.current) onOpenTask(node.id); }}
         onKeyDown={e => { if (e.key === 'Enter') onOpenTask(node.id); }}
+        onContextMenu={draggable ? e => e.preventDefault() : undefined}
+        onPointerDown={draggable ? e => {
+          if (e.pointerType === 'mouse' && e.button !== 0) return;
+          if ((e.target as HTMLElement).closest('button')) return;
+          const mouse = e.pointerType === 'mouse';
+          cancelPress();
+          press.current = {
+            x: e.clientX, y: e.clientY, card, from: column.key, el: e.currentTarget, mouse,
+            timer: mouse ? 0 : window.setTimeout(() => startDrag(press.current!.x, press.current!.y), HOLD_MS)
+          };
+        } : undefined}
+        onPointerMove={draggable ? e => {
+          const p = press.current;
+          if (!p || dragRef.current) return;
+          const moved = Math.hypot(e.clientX - p.x, e.clientY - p.y) > MOVE_TOLERANCE;
+          if (p.mouse) { if (moved) startDrag(e.clientX, e.clientY); }
+          else if (moved) cancelPress(); // se movió antes de tiempo: es un scroll
+        } : undefined}
+        onPointerUp={draggable ? () => { if (!dragRef.current) cancelPress(); } : undefined}
+        onPointerCancel={draggable ? () => { if (!dragRef.current) cancelPress(); } : undefined}
         style={{
           background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderLeft: `3px solid ${done ? '#10b981' : delay > 0 ? DELAY_COLOR : 'var(--border-color)'}`,
-          borderRadius: '12px', padding: '10px 11px', cursor: 'pointer', boxShadow: 'var(--shadow-sm)', opacity: done && criterion !== 'state' ? 0.75 : 1
-        }}
+          borderRadius: '12px', padding: '10px 11px', cursor: draggable ? 'grab' : 'pointer', boxShadow: 'var(--shadow-sm)',
+          opacity: isDragged ? 0.35 : done && criterion !== 'state' ? 0.75 : 1,
+          userSelect: draggable ? 'none' : undefined, WebkitUserSelect: draggable ? 'none' : undefined, WebkitTouchCallout: draggable ? 'none' : undefined
+        } as React.CSSProperties}
       >
         {criterion !== 'parent' && card.parentName && (
           <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -292,6 +432,11 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
           Ocultar concluidos
         </label>
       </div>
+      {criterion === 'state' && (
+        <div style={{ margin: '-2px 2px 10px', fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+          Mantén presionada una tarjeta y arrástrala a otra columna para cambiar su estado.
+        </div>
+      )}
 
       {criterion === 'people' && !participants ? (
         <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
@@ -303,8 +448,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         </div>
       ) : (
         <div
+          ref={boardRef}
           style={{
-            display: 'flex', gap: '10px', overflowX: 'auto', scrollSnapType: 'x mandatory', overscrollBehaviorX: 'contain',
+            // Sin "snap" mientras se arrastra: pelearía con el desplazamiento automático
+            display: 'flex', gap: '10px', overflowX: 'auto', scrollSnapType: drag ? 'none' : 'x mandatory', overscrollBehaviorX: 'contain',
             paddingBottom: '8px', margin: '0 -4px', paddingLeft: '4px', paddingRight: '4px'
           }}
         >
@@ -312,12 +459,16 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
             const open = expanded[column.key];
             const shown = open ? column.cards : column.cards.slice(0, PAGE);
             const doneCount = column.cards.filter(c => c.done).length;
+            const dropTarget = !!drag && drag.over === column.key && drag.from !== column.key && column.stateId !== undefined;
             return (
               <section
                 key={column.key}
                 aria-label={column.label}
+                data-col={column.key}
                 style={{
-                  flex: '0 0 min(80%, 290px)', minWidth: 0, scrollSnapAlign: 'start', background: 'var(--bg-main)', border: '1px solid var(--border-color)',
+                  flex: '0 0 min(80%, 290px)', minWidth: 0, scrollSnapAlign: 'start',
+                  background: dropTarget ? 'var(--primary-soft)' : 'var(--bg-main)',
+                  border: dropTarget ? `2px dashed ${column.color}` : '1px solid var(--border-color)', transition: 'background 0.12s ease',
                   borderRadius: '16px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px', alignSelf: 'flex-start'
                 }}
               >
@@ -346,6 +497,62 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
             );
           })}
         </div>
+      )}
+
+      {confirmDone && createPortal(
+        <div
+          role="dialog"
+          aria-label="Confirmar conclusión del hito"
+          style={{
+            position: 'fixed', left: 12, right: 12, bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))', zIndex: 3000,
+            background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '14px',
+            boxShadow: '0 14px 30px rgba(0, 0, 0, 0.25)', maxWidth: 480, margin: '0 auto'
+          }}
+        >
+          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: 4 }}>¿Concluir este hito?</div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 12, overflowWrap: 'anywhere' }}>
+            {confirmDone.name} — se registra la fecha real y ya no se puede regresar a otro estado.
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" onClick={() => setConfirmDone(null)} style={{ flex: 1, padding: '9px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--card-bg)', color: 'var(--text-main)', fontWeight: 700, cursor: 'pointer' }}>
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => { const node = confirmDone; setConfirmDone(null); onComplete(node); }}
+              style={{ flex: 1, padding: '9px', borderRadius: 12, border: 'none', background: '#10b981', color: '#fff', fontWeight: 800, cursor: 'pointer' }}
+            >
+              Concluir
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Tarjeta que sigue al dedo */}
+      {drag && createPortal(
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'fixed', left: drag.x - drag.dx, top: drag.y - drag.dy, width: drag.width, zIndex: 3000, pointerEvents: 'none',
+            transform: 'rotate(2deg) scale(1.03)', background: 'var(--card-bg)', border: '1px solid var(--primary)', borderRadius: '12px',
+            padding: '10px 11px', boxShadow: '0 14px 30px rgba(0, 0, 0, 0.25)'
+          }}
+        >
+          {drag.card.parentName && (
+            <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {drag.card.parentName}
+            </div>
+          )}
+          <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' }}>{drag.card.node.name}</div>
+          <div style={{ marginTop: 6, fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)' }}>
+            {(() => {
+              const target = drag.over && drag.over !== drag.from ? columns.find(c => c.key === drag.over) : null;
+              return target && target.stateId !== undefined ? (target.stateId === 0 ? 'Soltar para concluir' : `Mover a ${target.label}`) : 'Arrastra a otra columna';
+            })()}
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
