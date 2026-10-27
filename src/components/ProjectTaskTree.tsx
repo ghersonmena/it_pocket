@@ -8,6 +8,7 @@ import { TaskFormView } from './TaskFormView';
 import { TaskDetailView } from './TaskDetailView';
 import { GanttView } from './GanttView';
 import { SwipeToComplete } from './SwipeToComplete';
+import { KanbanView } from './KanbanView';
 import { TaskNotes } from './TaskNotes';
 import { TaskPhotos } from './TaskPhotos';
 import { AssignParticipants } from './AssignParticipants';
@@ -143,7 +144,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
   const popView = () => setViewStack(stack => stack.slice(0, -1));
   const [projectNotesOpen, setProjectNotesOpen] = useState<boolean>(false);
   // Vista de las tareas: árbol (lista) o diagrama de Gantt
-  const [taskView, setTaskView] = useState<'tree' | 'gantt'>('tree');
+  const [taskView, setTaskView] = useState<'tree' | 'gantt' | 'kanban'>('tree');
 
   const showToast = (msg: string, ms = 3500) => {
     setToastMsg(msg);
@@ -408,6 +409,23 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
       console.error('Error al completar hito:', err);
       setToastMsg('No se pudo actualizar el hito en GLPI.');
       setTimeout(() => setToastMsg(null), 3000);
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  };
+
+  // Tablero Kanban: mover un hito pendiente a otro estado abierto
+  const handleMoveState = async (node: ProjectTaskNode, stateId: number) => {
+    setUpdatingTaskId(node.id);
+    try {
+      await ProjectTaskService.setTaskState(session, node, stateId);
+      const next = flatTasks.map(t => (t.id === node.id ? { ...t, projectstates_id: stateId, state: stateId } : t));
+      setFlatTasks(next);
+      await runSync(next);
+      onTasksChanged?.();
+    } catch (err: any) {
+      console.error('Error al cambiar el estado del hito:', err);
+      showToast(err.message || 'No se pudo cambiar el estado del hito en GLPI.', 3000);
     } finally {
       setUpdatingTaskId(null);
     }
@@ -965,7 +983,7 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
         </h4>
 
         <div style={{ display: 'flex', gap: '2px', padding: '3px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '10px' }}>
-          {([['tree', 'Árbol'], ['gantt', 'Gantt']] as const).map(([key, label]) => (
+          {([['tree', 'Árbol'], ['gantt', 'Gantt'], ['kanban', 'Kanban']] as const).map(([key, label]) => (
             <button
               key={key}
               type="button"
@@ -1093,6 +1111,16 @@ export const ProjectTaskTree: React.FC<ProjectTaskTreeProps> = ({ session, proje
         </div>
       ) : taskView === 'gantt' ? (
         <GanttView nodes={treeNodes} onOpenTask={id => pushView({ kind: 'task', id })} />
+      ) : taskView === 'kanban' ? (
+        <KanbanView
+          session={session}
+          nodes={treeNodes}
+          participants={participantsLoaded ? participants : undefined}
+          updatingTaskId={updatingTaskId}
+          onOpenTask={id => pushView({ kind: 'task', id })}
+          onComplete={node => handleToggleComplete(node)}
+          onMoveState={handleMoveState}
+        />
       ) : (
         <div>
           {treeNodes.map(node => renderTreeNode(node))}

@@ -205,6 +205,16 @@ export class ProjectTaskService {
     await GLPIService.putItem(session, 'ProjectTask', task.id, changes, 'la tarea');
   }
 
+  /** Cambia el estado de un hito (tablero Kanban). Concluirlo va por completeTaskMilestone. */
+  static async setTaskState(session: GLPISession, task: GLPIProjectTask, stateId: number): Promise<void> {
+    if (session.isMock) {
+      const found = GLPIService.mockProjectTasks(task.projects_id).find(t => t.id === task.id);
+      if (found) Object.assign(found, { projectstates_id: stateId, state: stateId });
+      return;
+    }
+    await GLPIService.putItem(session, 'ProjectTask', task.id, { projectstates_id: stateId }, 'la tarea');
+  }
+
   /**
    * Calcula (sin guardar) lo que debe cambiar en las tareas padre y en el proyecto según las
    * reglas de arriba. Solo se incluyen los campos que realmente cambian.
