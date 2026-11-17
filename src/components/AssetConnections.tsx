@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import type { GLPISession } from '../types/glpi';
 import { AssetService, getAssetType, CONNECTABLE_TYPES } from '../services/assetService';
 import type { AssetConnection, AssetSummary } from '../services/assetService';
-import { RefreshCw, Plus, Unplug, Link2, Search, X, Monitor, Mouse, Phone, Printer, Laptop, ArrowRightLeft, Info, ChevronRight } from 'lucide-react';
+import { ScannerModal } from './ScannerModal';
+import { RefreshCw, Plus, Unplug, Link2, Search, X, Monitor, Mouse, Phone, Printer, Laptop, ArrowRightLeft, Info, ChevronRight, ScanLine } from 'lucide-react';
 
 interface SectionProps {
   session: GLPISession;
@@ -23,6 +24,22 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 };
 
 const normalize = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+// Sin espacios ni separadores: lo escaneado ("PC-000103") coincide aunque GLPI lo tenga como "PC 000103"
+const compact = (value: string) => normalize(value).replace(/[^a-z0-9]/g, '');
+
+const matchesSearch = (asset: AssetSummary, words: string[]): boolean => {
+  if (!words.length) return true;
+  const fields = [asset.name, asset.physicalTag, asset.serial, asset.inventoryNumber, asset.userName, asset.location].filter(Boolean) as string[];
+  const haystack = normalize(fields.join(' '));
+  const compactHaystack = fields.map(compact).join(' ');
+  return words.every(w => haystack.includes(w) || (compact(w).length > 0 && compactHaystack.includes(compact(w))));
+};
+
+// Computadora de la que salió un dispositivo al moverlo (para ofrecer reponerle otro)
+interface MovedFrom {
+  id: number;
+  name: string;
+}
 
 // Aviso de lo que GLPI hace al conectar (configuración de la instancia)
 const AutoUpdateHint: React.FC = () => (
@@ -79,11 +96,13 @@ interface PickerProps {
   types: string[];                 // tipos entre los que se elige (pestañas)
   excludeComputerId?: number;      // computadora actual: sus dispositivos ya conectados no se ofrecen
   currentComputerIds?: number[];   // para un dispositivo: la computadora a la que ya está conectado
-  onPick: (itemtype: string, asset: AssetSummary) => Promise<void>;
+  // `from`: la computadora que se queda sin el dispositivo, si estaba conectado en otra
+  onPick: (itemtype: string, asset: AssetSummary, from?: MovedFrom) => Promise<void>;
   onClose: () => void;
+  offersRefill?: boolean;          // después de mover se preguntará qué conectar en la otra computadora
 }
 
-const ConnectPicker: React.FC<PickerProps> = ({ session, title, types, excludeComputerId, currentComputerIds = [], onPick, onClose }) => {
+const ConnectPicker: React.FC<PickerProps> = ({ session, title, types, excludeComputerId, currentComputerIds = [], onPick, onClose, offersRefill = true }) => {
   const [type, setType] = useState<string>(types[0]);
   const [assets, setAssets] = useState<AssetSummary[] | null>(null);
   const [links, setLinks] = useState<{ itemtype: string; itemId: number; computerId: number }[]>([]);
@@ -92,16 +111,29 @@ const ConnectPicker: React.FC<PickerProps> = ({ session, title, types, excludeCo
   const [confirming, setConfirming] = useState<{ asset: AssetSummary; from: string } | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  // Escanear la etiqueta del dispositivo (código de barras, QR o texto) para filtrar la lista
+  const [scanning, setScanning] = useState<boolean>(false);
+  const [scanInfo, setScanInfo] = useState<string | null>(null);
+  // Listas ya cargadas por tipo: al escanear se busca también en los demás tipos sin recargar
+  const listCache = React.useRef<Map<string, AssetSummary[]>>(new Map());
+  const typeRowRef = React.useRef<HTMLDivElement>(null);
+
+  // La pestaña elegida (también cuando el escaneo cambia de tipo) siempre a la vista
+  useEffect(() => {
+    typeRowRef.current?.querySelector<HTMLElement>(`[data-type="${type}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [type]);
 
   useEffect(() => {
     let cancelled = false;
+    const cached = listCache.current.get(type);
     Promise.all([
-      AssetService.listAssets(session, type),
+      cached ? Promise.resolve(cached) : AssetService.listAssets(session, type),
       AssetService.getAllConnections(session),
       AssetService.listAssets(session, 'Computer')
     ])
       .then(([list, allLinks, computers]) => {
         if (cancelled) return;
+        listCache.current.set(type, list);
         setAssets(list);
         setLinks(allLinks);
         setComputerNames(new Map(computers.map(c => [c.id, c.name])));
@@ -119,11 +151,41 @@ const ConnectPicker: React.FC<PickerProps> = ({ session, title, types, excludeCo
     // No ofrecer lo que ya está conectado aquí
     .filter(a => !(excludeComputerId !== undefined && connectedTo(a) === excludeComputerId))
     .filter(a => !(type === 'Computer' && currentComputerIds.includes(a.id)))
-    .filter(a => {
-      if (!words.length) return true;
-      const haystack = normalize([a.name, a.physicalTag, a.serial, a.inventoryNumber, a.userName, a.location].filter(Boolean).join(' '));
-      return words.every(w => haystack.includes(w));
-    });
+    .filter(a => matchesSearch(a, words));
+
+  // Lo escaneado filtra la lista; si no está en el tipo elegido se busca en los demás y se cambia
+  const applyScan = async (value: string) => {
+    setSearch(value);
+    setScanInfo(null);
+    const scanWords = normalize(value.trim()).split(/\s+/).filter(Boolean);
+    const order = [type, ...types.filter(t => t !== type)];
+    try {
+      for (const t of order) {
+        let list = listCache.current.get(t);
+        if (!list) {
+          list = await AssetService.listAssets(session, t);
+          listCache.current.set(t, list);
+        }
+        if (list.some(a => matchesSearch(a, scanWords))) {
+          if (t !== type) {
+            setScanInfo(`Encontrado en ${getAssetType(t).label.toLowerCase()}.`);
+            setAssets(null);
+            setType(t);
+          }
+          return;
+        }
+      }
+      setScanInfo(`Ningún ${types.length > 1 ? 'dispositivo' : getAssetType(type).singular.toLowerCase()} coincide con «${value}». Revisa el texto o búscalo a mano.`);
+    } catch {
+      /* sin conexión: queda el filtro en el tipo actual */
+    }
+  };
+
+  // Computadora que se queda sin el dispositivo al moverlo
+  const movedFrom = (asset: AssetSummary): MovedFrom | undefined => {
+    const id = type === 'Computer' ? currentComputerIds[0] : connectedTo(asset);
+    return id === undefined ? undefined : { id, name: computerNames.get(id) || `Computadora #${id}` };
+  };
 
   const choose = async (asset: AssetSummary, confirmed = false) => {
     const computerId = connectedTo(asset);
@@ -134,7 +196,7 @@ const ConnectPicker: React.FC<PickerProps> = ({ session, title, types, excludeCo
     setSaving(true);
     setError(null);
     try {
-      await onPick(type, asset);
+      await onPick(type, asset, movedFrom(asset));
       onClose();
     } catch (err: any) {
       setError(err.message || 'No se pudo conectar.');
@@ -179,6 +241,7 @@ const ConnectPicker: React.FC<PickerProps> = ({ session, title, types, excludeCo
               <div style={{ fontSize: '0.84rem', color: 'var(--text-main)', lineHeight: 1.45 }}>
                 <strong>{confirming.asset.name}</strong> ya está conectado a <strong>{confirming.from}</strong>.
                 En GLPI solo puede estar en una computadora: se desconectará de {confirming.from} y se conectará aquí.
+                {offersRefill && ` Después podrás elegir qué le conectas a ${confirming.from} en su lugar.`}
               </div>
             </div>
             <AutoUpdateHint />
@@ -195,10 +258,11 @@ const ConnectPicker: React.FC<PickerProps> = ({ session, title, types, excludeCo
         ) : (
           <>
             {types.length > 1 && (
-              <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '0 16px 10px', scrollbarWidth: 'none' }}>
+              <div ref={typeRowRef} style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '0 16px 10px', scrollbarWidth: 'none' }}>
                 {types.map(t => (
                   <button
                     key={t}
+                    data-type={t}
                     type="button"
                     onClick={() => { if (t !== type) { setAssets(null); setType(t); } }}
                     style={{
@@ -220,11 +284,34 @@ const ConnectPicker: React.FC<PickerProps> = ({ session, title, types, excludeCo
                 <input
                   autoFocus
                   value={search}
-                  onChange={e => setSearch(e.target.value)}
+                  onChange={e => { setSearch(e.target.value); setScanInfo(null); }}
                   placeholder="Nombre, etiqueta, serie, usuario..."
                   style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', color: 'var(--text-main)', fontSize: '0.88rem', fontFamily: 'inherit' }}
                 />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => { setSearch(''); setScanInfo(null); }}
+                    aria-label="Limpiar búsqueda"
+                    style={{ display: 'flex', padding: '2px', border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setScanning(true)}
+                  aria-label="Escanear etiqueta"
+                  title="Escanear código de barras, QR o texto"
+                  style={{
+                    display: 'flex', padding: '6px', margin: '-4px -6px -4px 0', borderRadius: '10px', border: 'none',
+                    background: 'rgba(245, 165, 36, 0.12)', color: 'var(--primary)', cursor: 'pointer'
+                  }}
+                >
+                  <ScanLine size={17} />
+                </button>
               </div>
+              {scanInfo && <div style={{ marginTop: '8px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>{scanInfo}</div>}
               {error && <div style={{ marginTop: '8px', fontSize: '0.78rem', fontWeight: 600, color: '#dc2626' }}>{error}</div>}
             </div>
 
@@ -275,10 +362,151 @@ const ConnectPicker: React.FC<PickerProps> = ({ session, title, types, excludeCo
           </>
         )}
       </div>
+
+      {scanning && (
+        <ScannerModal
+          fieldLabel={types.length > 1 ? 'Buscar dispositivo' : `Buscar ${getAssetType(types[0]).singular.toLowerCase()}`}
+          kind="alphanumeric"
+          onResult={value => { applyScan(value); }}
+          onClose={() => setScanning(false)}
+        />
+      )}
     </div>,
     document.body
   );
 };
+
+// ── Después de mover un dispositivo: ¿la computadora de donde salió necesita otro?
+// Si fue un intercambio entre los dos equipos, se le pasa el del mismo tipo que tenía el destino.
+
+interface RefillProps {
+  session: GLPISession;
+  itemtype: string;       // tipo del dispositivo movido
+  movedId: number;
+  movedName: string;
+  to: MovedFrom;          // computadora a la que llegó
+  from: MovedFrom;        // computadora que se quedó sin él
+  onChanged: () => void;
+  onClose: () => void;
+}
+
+const RefillPrompt: React.FC<RefillProps> = ({ session, itemtype, movedId, movedName, to, from, onChanged, onClose }) => {
+  const singular = getAssetType(itemtype).singular.toLowerCase();
+  // Del mismo tipo que ya tenía la computadora destino: candidatos para el intercambio
+  const [swapOptions, setSwapOptions] = useState<AssetConnection[] | null>(null);
+  const [picking, setPicking] = useState<boolean>(false);
+  const [saving, setSaving] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    AssetService.getComputerConnections(session, to.id)
+      .then(list => { if (!cancelled) setSwapOptions(list.filter(c => c.itemtype === itemtype && c.itemId !== movedId)); })
+      .catch(() => { if (!cancelled) setSwapOptions([]); });
+    return () => { cancelled = true; };
+  }, [session, to.id, itemtype, movedId]);
+
+  const swap = async (conn: AssetConnection) => {
+    setSaving(conn.itemId);
+    setError(null);
+    try {
+      await AssetService.moveConnection(session, from.id, conn.itemtype, conn.itemId);
+      onChanged();
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'No se pudo conectar.');
+      setSaving(null);
+    }
+  };
+
+  if (picking) {
+    return (
+      <ConnectPicker
+        session={session}
+        title={`Conectar a ${from.name}`}
+        types={[itemtype]}
+        excludeComputerId={from.id}
+        offersRefill={false}
+        onPick={(type, asset) => AssetService.moveConnection(session, from.id, type, asset.id).then(onChanged)}
+        onClose={onClose}
+      />
+    );
+  }
+
+  return createPortal(
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 'calc(16px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px))',
+        background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)'
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="refill-title"
+        className="modal-pop"
+        style={{
+          width: '100%', maxWidth: '420px', maxHeight: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px',
+          padding: '16px', background: 'var(--card-bg)', borderRadius: '24px', border: '1px solid var(--border-color)',
+          boxShadow: '0 24px 60px -12px rgba(0, 0, 0, 0.45)'
+        }}
+      >
+        <div id="refill-title" style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>
+          ¿{from.name} necesita otro {singular}?
+        </div>
+        <div style={{ fontSize: '0.84rem', color: 'var(--text-main)', lineHeight: 1.45 }}>
+          <strong>{movedName}</strong> pasó de <strong>{from.name}</strong> a <strong>{to.name}</strong>.
+          Si fue un cambio entre los dos equipos, conecta a {from.name} el que tenía {to.name}.
+        </div>
+
+        {swapOptions === null ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            <RefreshCw size={14} className="spin" /> Revisando {to.name}...
+          </div>
+        ) : swapOptions.map(conn => (
+          <button
+            key={conn.linkId}
+            type="button"
+            className="btn-primary"
+            onClick={() => swap(conn)}
+            disabled={saving !== null}
+            style={{ padding: '12px 14px', justifyContent: 'flex-start', textAlign: 'left' }}
+          >
+            {saving === conn.itemId ? <RefreshCw size={16} className="spin" /> : <ArrowRightLeft size={16} style={{ flexShrink: 0 }} />}
+            <span style={{ minWidth: 0 }}>
+              Intercambiar: pasar <strong>{conn.name}</strong> a {from.name}
+            </span>
+          </button>
+        ))}
+
+        {error && <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#dc2626' }}>{error}</div>}
+
+        <button type="button" className="btn-secondary" onClick={() => setPicking(true)} disabled={saving !== null} style={{ marginTop: 0 }}>
+          <Plus size={16} /> Elegir otro {singular} para {from.name}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={saving !== null}
+          style={{ padding: '8px', border: 'none', background: 'none', color: 'var(--text-muted)', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          No, dejarlo así
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// Datos para preguntar si se repone el dispositivo en la computadora de donde salió
+interface RefillState {
+  itemtype: string;
+  movedId: number;
+  movedName: string;
+  to: MovedFrom;
+  from: MovedFrom;
+}
 
 // ── Pestaña "Conexiones" de una computadora: sus monitores, dispositivos, teléfonos e impresoras
 export const ComputerConnectionsSection: React.FC<SectionProps> = ({ session, assetId, assetName, onOpenAsset }) => {
@@ -286,6 +514,7 @@ export const ComputerConnectionsSection: React.FC<SectionProps> = ({ session, as
   const [error, setError] = useState<string | null>(null);
   const [busyLink, setBusyLink] = useState<number | null>(null);
   const [picking, setPicking] = useState<boolean>(false);
+  const [refill, setRefill] = useState<RefillState | null>(null);
   const [reloadKey, setReloadKey] = useState<number>(0);
 
   useEffect(() => {
@@ -359,8 +588,20 @@ export const ComputerConnectionsSection: React.FC<SectionProps> = ({ session, as
           title={`Conectar a ${assetName}`}
           types={CONNECTABLE_TYPES}
           excludeComputerId={assetId}
-          onPick={(itemtype, asset) => AssetService.moveConnection(session, assetId, itemtype, asset.id).then(() => setReloadKey(k => k + 1))}
+          onPick={(itemtype, asset, from) => AssetService.moveConnection(session, assetId, itemtype, asset.id).then(() => {
+            setReloadKey(k => k + 1);
+            if (from) setRefill({ itemtype, movedId: asset.id, movedName: asset.name, to: { id: assetId, name: assetName }, from });
+          })}
           onClose={() => setPicking(false)}
+        />
+      )}
+
+      {refill && (
+        <RefillPrompt
+          session={session}
+          {...refill}
+          onChanged={() => setReloadKey(k => k + 1)}
+          onClose={() => setRefill(null)}
         />
       )}
     </>
@@ -373,6 +614,7 @@ export const ItemConnectionSection: React.FC<SectionProps> = ({ session, itemtyp
   const [error, setError] = useState<string | null>(null);
   const [busyLink, setBusyLink] = useState<number | null>(null);
   const [picking, setPicking] = useState<boolean>(false);
+  const [refill, setRefill] = useState<RefillState | null>(null);
   const [reloadKey, setReloadKey] = useState<number>(0);
 
   useEffect(() => {
@@ -443,8 +685,20 @@ export const ItemConnectionSection: React.FC<SectionProps> = ({ session, itemtyp
           title={`Conectar ${assetName} a...`}
           types={['Computer']}
           currentComputerIds={(connections || []).map(c => c.computerId)}
-          onPick={(_type, computer) => AssetService.moveConnection(session, computer.id, itemtype, assetId).then(() => setReloadKey(k => k + 1))}
+          onPick={(_type, computer, from) => AssetService.moveConnection(session, computer.id, itemtype, assetId).then(() => {
+            setReloadKey(k => k + 1);
+            if (from) setRefill({ itemtype, movedId: assetId, movedName: assetName, to: { id: computer.id, name: computer.name }, from });
+          })}
           onClose={() => setPicking(false)}
+        />
+      )}
+
+      {refill && (
+        <RefillPrompt
+          session={session}
+          {...refill}
+          onChanged={() => setReloadKey(k => k + 1)}
+          onClose={() => setRefill(null)}
         />
       )}
     </>

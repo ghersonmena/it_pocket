@@ -8,6 +8,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: '1.9.4',
+    date: '2026-11-17',
+    notes: [
+      'Al conectar un monitor, dispositivo, teléfono o impresora a una computadora, escanea su etiqueta (código de barras, QR o texto) para encontrarlo; si es de otro tipo, la app cambia sola de pestaña',
+      'Si el dispositivo estaba en otra computadora, al moverlo te pregunta si esa computadora necesita otro: puedes intercambiarle el que tenía la tuya o elegir uno distinto'
+    ]
+  },
+  {
     version: '1.9.3',
     date: '2026-11-17',
     notes: [

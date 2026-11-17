@@ -175,9 +175,13 @@ const readError = async (res: Response): Promise<string> => {
 let mockSeq = 1000;
 const MOCK_ASSETS: Record<string, (AssetForm & { id: number })[]> = {
   Computer: [
-    { ...emptyAssetForm(), id: 89, name: 'PC-SIS-01', serial: 'MXL1234ABC', otherserial: 'INV-0103', physicalTag: 'PC-000103', locations_id: 2, states_id: 1, users_id: 2 }
+    { ...emptyAssetForm(), id: 89, name: 'PC-SIS-01', serial: 'MXL1234ABC', otherserial: 'INV-0103', physicalTag: 'PC-000103', locations_id: 2, states_id: 1, users_id: 2 },
+    { ...emptyAssetForm(), id: 90, name: 'PC-VEN-02', serial: 'MXL5678DEF', otherserial: 'INV-0104', physicalTag: 'PC-000104', locations_id: 2, states_id: 1 }
   ],
-  Monitor: [{ ...emptyAssetForm(), id: 12, name: 'MON-SIS-01', serial: 'CN0ABC123', locations_id: 1, states_id: 1 }]
+  Monitor: [
+    { ...emptyAssetForm(), id: 12, name: 'MON-SIS-01', serial: 'CN0ABC123', locations_id: 1, states_id: 1 },
+    { ...emptyAssetForm(), id: 13, name: 'MON-VEN-02', serial: 'CN0XYZ789', physicalTag: 'MON-000013', locations_id: 2, states_id: 1 }
+  ]
 };
 const MOCK_DROPDOWNS: Record<string, DropdownOption[]> = {
   Location: [
@@ -201,7 +205,8 @@ const MOCK_NETWORK: NetworkPortInfo[] = [
 ];
 
 const MOCK_CONNECTIONS: { linkId: number; itemtype: string; itemId: number; computerId: number }[] = [
-  { linkId: 1, itemtype: 'Monitor', itemId: 12, computerId: 89 }
+  { linkId: 1, itemtype: 'Monitor', itemId: 12, computerId: 89 },
+  { linkId: 2, itemtype: 'Monitor', itemId: 13, computerId: 90 }
 ];
 
 const MOCK_FILTERS: (SavedFilter & { itemtype: string })[] = [
