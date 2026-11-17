@@ -1114,13 +1114,13 @@ export class GLPIService {
   }
 
   /**
-   * Notas (Notepad) de una tarea de proyecto, de la más reciente a la más antigua.
+   * Notas (Notepad) de un elemento, de la más reciente a la más antigua: una tarea (por defecto),
+   * el proyecto o un activo (Computer, Monitor...). No se heredan entre niveles.
    * Las notas se guardan como registros independientes en GLPI, así que forman un historial.
    */
-  /** Notas de una tarea (o del proyecto, con itemtype 'Project'). No se heredan entre niveles. */
-  static async getTaskNotes(session: GLPISession, taskId: number, itemtype: 'ProjectTask' | 'Project' = 'ProjectTask'): Promise<GLPINote[]> {
+  static async getTaskNotes(session: GLPISession, taskId: number, itemtype: string = 'ProjectTask'): Promise<GLPINote[]> {
     if (session.isMock) {
-      return [...(MOCK_TASK_NOTES[itemtype === 'Project' ? -taskId : taskId] || [])].sort((a, b) => b.date.localeCompare(a.date));
+      return [...(MOCK_TASK_NOTES[mockNotesKey(itemtype, taskId)] || [])].sort((a, b) => b.date.localeCompare(a.date));
     }
 
     const response = await fetch(
@@ -1135,7 +1135,7 @@ export class GLPIService {
     );
 
     if (!response.ok) {
-      throw new Error(`No se pudieron cargar las notas de la tarea (${response.status})`);
+      throw new Error(`No se pudieron cargar las notas (${response.status})`);
     }
 
     const raw = await response.json();
@@ -1145,8 +1145,8 @@ export class GLPIService {
       .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
   }
 
-  /** Agrega una nota a una tarea de proyecto. */
-  static async addTaskNote(session: GLPISession, taskId: number, text: string, itemtype: 'ProjectTask' | 'Project' = 'ProjectTask'): Promise<GLPINote> {
+  /** Agrega una nota a una tarea de proyecto (o al elemento de `itemtype`). */
+  static async addTaskNote(session: GLPISession, taskId: number, text: string, itemtype: string = 'ProjectTask'): Promise<GLPINote> {
     const nowStr = this.toGlpiDateTime(new Date());
 
     if (session.isMock) {
@@ -1156,7 +1156,7 @@ export class GLPIService {
         date: nowStr,
         user_name: session.username || 'Usuario Demo'
       };
-      (MOCK_TASK_NOTES[itemtype === 'Project' ? -taskId : taskId] ||= []).push(note);
+      (MOCK_TASK_NOTES[mockNotesKey(itemtype, taskId)] ||= []).push(note);
       return note;
     }
 
@@ -1927,7 +1927,11 @@ const MOCK_TASK_PARTICIPANTS: Record<number, TaskParticipant[]> = {
   27: [{ itemtype: 'Group', id: 1, name: 'Soporte Técnico', rowId: 5 }]
 };
 
-const MOCK_TASK_NOTES: Record<number, GLPINote[]> = {
+// Clave de las notas demo: tareas por id, proyectos en negativo y los demás elementos "Tipo#id"
+const mockNotesKey = (itemtype: string, id: number): number | string =>
+  itemtype === 'ProjectTask' ? id : itemtype === 'Project' ? -id : `${itemtype}#${id}`;
+
+const MOCK_TASK_NOTES: Record<number | string, GLPINote[]> = {
   22: [
     { id: 1, content: 'Se agendó con el usuario para el sábado 10 a las 9:00.', date: '2026-10-08 17:45:00', user_name: 'Usuario Demo' }
   ]

@@ -8,6 +8,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: '1.9.3',
+    date: '2026-11-17',
+    notes: [
+      'Activos: nueva pestaña Notas, el mismo historial de notas de GLPI que tienen las tareas',
+      'Cada nota queda con quién la escribió y cuándo'
+    ]
+  },
+  {
     version: '1.9.2',
     date: '2026-11-17',
     notes: [

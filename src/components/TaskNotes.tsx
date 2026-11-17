@@ -6,7 +6,7 @@ import { RefreshCw, Send, MessageSquare } from 'lucide-react';
 interface TaskNotesProps {
   session: GLPISession;
   taskId: number;
-  itemtype?: 'ProjectTask' | 'Project'; // notas de la tarea (por defecto) o del proyecto
+  itemtype?: string; // notas de la tarea (por defecto), del proyecto o de un activo
   indent: number;
   onCountChange?: (count: number) => void;
 }
@@ -23,7 +23,7 @@ const formatDate = (value: string): string => {
   });
 };
 
-// Historial de notas (Notepad de GLPI) de una tarea o del proyecto, con formulario para agregar una nueva
+// Historial de notas (Notepad de GLPI) de una tarea, del proyecto o de un activo, con formulario para agregar una nueva
 export const TaskNotes: React.FC<TaskNotesProps> = ({ session, taskId, itemtype = 'ProjectTask', indent, onCountChange }) => {
   const [notes, setNotes] = useState<GLPINote[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -88,7 +88,7 @@ export const TaskNotes: React.FC<TaskNotesProps> = ({ session, taskId, itemtype 
         <textarea
           value={draft}
           onChange={e => setDraft(e.target.value)}
-          placeholder={`Escribe una nota para el historial de ${itemtype === 'Project' ? 'este proyecto' : 'esta tarea'}...`}
+          placeholder={`Escribe una nota para el historial de ${itemtype === 'Project' ? 'este proyecto' : itemtype === 'ProjectTask' ? 'esta tarea' : 'este activo'}...`}
           rows={2}
           disabled={saving}
           style={{

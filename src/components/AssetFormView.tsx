@@ -8,11 +8,12 @@ import { SearchSelect } from './SearchSelect';
 import { AssetHardwareSection, AssetNetworkSection } from './AssetInfoSections';
 import { ScannerModal } from './ScannerModal';
 import { ItemPhotos } from './ItemPhotos';
+import { TaskNotes } from './TaskNotes';
 import { ComputerConnectionsSection, ItemConnectionSection } from './AssetConnections';
 import { FloorPlanService } from '../services/floorPlanService';
 import { ArrowLeft, RefreshCw, Save, CheckCircle2, Tag, Hash, Barcode, Fingerprint, CalendarPlus, CalendarX, ScanLine, Map as MapIcon, Ruler } from 'lucide-react';
 
-export type AssetTab = 'data' | 'hardware' | 'network' | 'photos' | 'connections';
+export type AssetTab = 'data' | 'hardware' | 'network' | 'photos' | 'notes' | 'connections';
 
 interface AssetFormViewProps {
   session: GLPISession;
@@ -270,6 +271,7 @@ export const AssetFormView: React.FC<AssetFormViewProps> = ({
             ...(itemtype === 'Computer' ? [['hardware', 'Hardware']] : []),
             ['network', 'Red'],
             ['photos', 'Fotos'],
+            ['notes', 'Notas'],
             // Computadora: sus dispositivos conectados; dispositivo: la computadora a la que está conectado
             ...(itemtype === 'Computer' ? [['connections', 'Conexiones']] : CONNECTABLE_TYPES.includes(itemtype) ? [['connections', 'Conexión']] : [])
           ] as [AssetTab, string][]).map(([key, label]) => (
@@ -300,6 +302,9 @@ export const AssetFormView: React.FC<AssetFormViewProps> = ({
         itemtype === 'Computer'
           ? <ComputerConnectionsSection session={session} itemtype={itemtype} assetId={currentId} assetName={original.name || `Computadora #${currentId}`} onOpenAsset={onOpenAsset ? openLinked : undefined} />
           : <ItemConnectionSection session={session} itemtype={itemtype} assetId={currentId} assetName={original.name || `${config.singular} #${currentId}`} onOpenAsset={onOpenAsset ? openLinked : undefined} />
+      )}
+      {!isNew && tab === 'notes' && currentId !== null && (
+        <TaskNotes session={session} taskId={currentId} itemtype={itemtype} indent={0} />
       )}
       {!isNew && tab === 'photos' && currentId !== null && (
         <ItemPhotos
