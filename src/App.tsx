@@ -26,6 +26,9 @@ import { OPEN_TASK_MESSAGE } from './services/deviceNotifications';
 import { refreshPushSubscription, unsubscribePush, notifyTasksChanged } from './services/pushClient';
 import { NotificationService } from './services/notificationService';
 import type { SlideDirection } from './hooks/useSwipeNavigation';
+import { WhatsNew } from './components/WhatsNew';
+import { unseenReleases, getSeenVersion, markReleasesSeen } from './releases';
+import type { Release } from './releases';
 
 // Orden de los módulos en la barra inferior; deslizar avanza o retrocede en este orden
 const TAB_ORDER: TabType[] = NAV_ITEMS.map(item => item.tab);
@@ -83,6 +86,12 @@ const isStoredSessionExpired = (): boolean => {
   }
 };
 
+// Novedades que este teléfono no ha visto (null si no hay)
+const pendingNews = (): Release[] | null => {
+  const unseen = unseenReleases(getSeenVersion());
+  return unseen.length ? unseen : null;
+};
+
 export const App: React.FC = () => {
   const [session, setSession] = useState<GLPISession | null>(loadStoredSession);
 
@@ -102,6 +111,9 @@ export const App: React.FC = () => {
   const [newAssetRequest, setNewAssetRequest] = useState<number>(0);
   const [projectFormOpen, setProjectFormOpen] = useState<boolean>(false);
   const [newProjectRequest, setNewProjectRequest] = useState<number>(0);
+  // Novedades de la versión: al entrar (inicio de sesión o sesión guardada) si hay algo sin ver
+  // en este teléfono, o a petición desde Ajustes
+  const [news, setNews] = useState<Release[] | null>(() => (session ? pendingNews() : null));
 
   // Cambiar de módulo animando hacia el lado que corresponde según el orden de la barra
   const goToTab = (tab: TabType) => {
@@ -172,6 +184,7 @@ export const App: React.FC = () => {
 
   const handleLoginSuccess = (newSession: GLPISession) => {
     setSession(newSession);
+    setNews(pendingNews());
     setActiveTab('projects');
     setSelectedTicket(null);
     setSelectedProject(null);
@@ -190,6 +203,11 @@ export const App: React.FC = () => {
     setSession(null);
     setSelectedTicket(null);
     setSelectedProject(null);
+  };
+
+  const closeNews = () => {
+    markReleasesSeen();
+    setNews(null);
   };
 
   const reminders = useTaskReminders(session);
@@ -335,6 +353,7 @@ export const App: React.FC = () => {
               <Settings
                 session={session}
                 onLogout={handleLogout}
+                onShowNews={() => setNews(unseenReleases(null).slice(0, 1))}
               />
             )}
           </div>
@@ -359,6 +378,8 @@ export const App: React.FC = () => {
           <Plus size={28} strokeWidth={2.5} />
         </button>
       )}
+
+      {session && news && <WhatsNew releases={news} onClose={closeNews} />}
 
       {session && (
         <NavDrawer

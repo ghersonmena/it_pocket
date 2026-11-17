@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { GLPISession } from '../types/glpi';
-import { Server, User, Moon, Sun, Smartphone, LogOut, CheckCircle2, Volume2, VolumeX, Play } from 'lucide-react';
+import { Server, User, Moon, Sun, Smartphone, LogOut, CheckCircle2, Volume2, VolumeX, Play, Sparkles, ChevronRight } from 'lucide-react';
 import { isNotificationSoundEnabled, setNotificationSoundEnabled, playNotificationSound } from '../services/notificationSound';
 import { NotificationSettings } from './NotificationSettings';
 import { getThemePreference, setThemePreference } from '../theme';
@@ -15,9 +15,10 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; icon: React.ReactN
 interface SettingsProps {
   session: GLPISession;
   onLogout: () => void;
+  onShowNews: () => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ session, onLogout }) => {
+export const Settings: React.FC<SettingsProps> = ({ session, onLogout, onShowNews }) => {
   const [theme, setTheme] = useState<ThemePreference>(getThemePreference);
   const [sound, setSound] = useState<boolean>(isNotificationSoundEnabled);
 
@@ -176,6 +177,21 @@ export const Settings: React.FC<SettingsProps> = ({ session, onLogout }) => {
           </button>
         )}
       </div>
+
+      {/* Versión de la app y sus novedades */}
+      <button
+        type="button"
+        className="card"
+        onClick={onShowNews}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: 'inherit' }}
+      >
+        <Sparkles size={20} color="var(--brand-amber)" />
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: '0.9rem', fontWeight: 700 }}>Novedades</span>
+          <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>ITPocket versión {__APP_VERSION__}</span>
+        </span>
+        <ChevronRight size={18} color="var(--text-muted)" />
+      </button>
 
       {/* Botón de Logout */}
       <button
