@@ -26,6 +26,7 @@ import { OPEN_TASK_MESSAGE } from './services/deviceNotifications';
 import { refreshPushSubscription, unsubscribePush, notifyTasksChanged } from './services/pushClient';
 import { NotificationService } from './services/notificationService';
 import type { SlideDirection } from './hooks/useSwipeNavigation';
+import { UpdateBanner } from './components/UpdateBanner';
 import { WhatsNew } from './components/WhatsNew';
 import { unseenReleases, getSeenVersion, markReleasesSeen } from './releases';
 import type { Release } from './releases';
@@ -264,6 +265,8 @@ export const App: React.FC = () => {
         unreadNotifications={reminders.unread}
         onNotifications={() => { setSelectedTicket(null); setSelectedProject(null); goToTab('notifications'); }}
       />
+
+      <UpdateBanner />
 
       {session && (
         <NotificationBanners

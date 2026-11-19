@@ -7,7 +7,17 @@ const { version } = JSON.parse(readFileSync(new URL('./package.json', import.met
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // version.json: la app instalada lo consulta para saber si hay una versión nueva y ofrecer recargar
+    {
+      name: 'itpocket-version-json',
+      apply: 'build',
+      generateBundle() {
+        this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ version }) })
+      }
+    }
+  ],
   define: {
     __APP_VERSION__: JSON.stringify(version)
   },

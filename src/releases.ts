@@ -8,6 +8,13 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: '1.9.5',
+    date: '2026-11-19',
+    notes: [
+      'La app instalada en el teléfono ahora recibe las actualizaciones: cuando hay una versión nueva aparece arriba el aviso "Nueva versión" con el botón Actualizar'
+    ]
+  },
+  {
     version: '1.9.4',
     date: '2026-11-17',
     notes: [

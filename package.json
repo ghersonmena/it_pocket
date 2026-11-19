@@ -1,7 +1,7 @@
 {
   "name": "glpi_app",
   "private": true,
-  "version": "1.9.4",
+  "version": "1.9.5",
   "type": "module",
   "scripts": {
     "predev": "node scripts/copy-ocr-assets.mjs",
